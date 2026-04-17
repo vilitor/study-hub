@@ -89,51 +89,60 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-
-      // Bottom Navigation Bar — inspirada na referência visual
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                ),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.calendar_month_rounded,
-                  label: 'Agenda',
-                ),
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.edit_note_rounded,
-                  label: 'Registro',
-                ),
-                _buildNavItem(
-                  index: 3,
-                  icon: Icons.settings_rounded,
-                  label: 'Config',
-                ),
-              ],
+  
+        // Bottom Navigation Bar — inspirada na referência visual
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    index: 0,
+                    icon: Icons.home_rounded,
+                    label: 'Home',
+                  ),
+                  _buildNavItem(
+                    index: 1,
+                    icon: Icons.calendar_month_rounded,
+                    label: 'Agenda',
+                  ),
+                  _buildNavItem(
+                    index: 2,
+                    icon: Icons.edit_note_rounded,
+                    label: 'Registro',
+                  ),
+                  _buildNavItem(
+                    index: 3,
+                    icon: Icons.settings_rounded,
+                    label: 'Config',
+                  ),
+                ],
+              ),
             ),
           ),
         ),

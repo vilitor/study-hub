@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:study_hub/models/study_log.dart';
 import 'package:study_hub/models/study_event.dart';
 import 'package:study_hub/services/notion_service.dart';
@@ -40,9 +41,15 @@ class StudyRepository {
 
   /// Saves an event locally and to Google Calendar
   Future<String?> scheduleEvent(StudyEvent event) async {
-    // 1. Sync with Google Calendar
+    debugPrint('[StudyRepository] 📅 Scheduling event: ${event.id}');
+    
+    // 1. Sync with Google Calendar (Remote)
     final googleId = await _googleCalendarService.createEvent(event);
     
+    if (googleId == null) {
+      debugPrint('[StudyRepository] ⚠️ Remote sync failed, event will be local-only.');
+    }
+
     // 2. Prepare event for storage (with sync status)
     final eventToSave = event.copyWith(
       calendarEventId: googleId,
@@ -51,14 +58,23 @@ class StudyRepository {
 
     // 3. Save locally
     final currentEvents = await _storageService.getStudyEvents();
-    currentEvents.add(eventToSave);
+    
+    // Check if event ID already exists (idempotency safety)
+    final existingIndex = currentEvents.indexWhere((e) => e.id == event.id);
+    if (existingIndex != -1) {
+      debugPrint('[StudyRepository] 🔄 Updating existing event in local storage.');
+      currentEvents[existingIndex] = eventToSave;
+    } else {
+      currentEvents.add(eventToSave);
+    }
+    
     await _storageService.saveStudyEvents(currentEvents);
-
     return googleId;
   }
 
   /// Removes an event locally and from Google Calendar
   Future<bool> deleteEvent(StudyEvent event) async {
+    debugPrint('[StudyRepository] 🗑️ Deleting event: ${event.id}');
     bool remoteDeleted = true;
 
     // 1. Try to delete from Google if synced
@@ -66,14 +82,23 @@ class StudyRepository {
       remoteDeleted = await _googleCalendarService.deleteEvent(event.calendarEventId!);
     }
 
-    // 2. If remote delete succeeded (or wasn't synced), remove local
+    // 2. Remove from local storage regardless of remote success if needed,
+    // but here we follow the existing logic: if remote fails, we return false
+    // unless the user forces it (handled in UI). 
+    // Optimization: always fetch current list to ensure consistency.
     if (remoteDeleted) {
       final currentEvents = await _storageService.getStudyEvents();
+      final countBefore = currentEvents.length;
       currentEvents.removeWhere((e) => e.id == event.id);
-      await _storageService.saveStudyEvents(currentEvents);
+      
+      if (currentEvents.length < countBefore) {
+        await _storageService.saveStudyEvents(currentEvents);
+        debugPrint('[StudyRepository] ✅ Local deletion successful.');
+      }
       return true;
     }
 
+    debugPrint('[StudyRepository] ❌ Remote deletion failed. Local state preserved.');
     return false;
   }
 

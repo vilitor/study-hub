@@ -68,6 +68,14 @@ class StudyEventProvider extends ChangeNotifier {
 
   /// Adds a new event to the schedule and attempts to sync with Google Calendar.
   Future<void> addEvent(StudyEvent event) async {
+    if (_isLoading) {
+      debugPrint('[StudyEventProvider] ⚠️ Blocked: Operation already in progress.');
+      return;
+    }
+
+    _setLoading(true);
+    debugPrint('[StudyEventProvider] 🚀 Initiating addEvent for: ${event.title}');
+    
     try {
       // The repository handles both remote sync and local storage
       final googleId = await _repository.scheduleEvent(event);
@@ -80,8 +88,11 @@ class StudyEventProvider extends ChangeNotifier {
       
       _events.add(syncedEvent);
       notifyListeners();
+      debugPrint('[StudyEventProvider] ✅ addEvent completed.');
     } catch (e) {
-      debugPrint('Error adding event: $e');
+      debugPrint('[StudyEventProvider] ❌ Error adding event: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -103,15 +114,26 @@ class StudyEventProvider extends ChangeNotifier {
   /// Removes an event and its remote counterpart (if synced).
   /// Returns [true] if successfully deleted (or not synced).
   Future<bool> deleteEvent(StudyEvent event) async {
+    if (_isLoading) {
+      debugPrint('[StudyEventProvider] ⚠️ Blocked: Deletion already in progress.');
+      return false;
+    }
+
+    _setLoading(true);
+    debugPrint('[StudyEventProvider] 🗑️ Initiating deleteEvent for: ${event.id}');
+
     try {
       final success = await _repository.deleteEvent(event);
       if (success) {
         removeEvent(event.id);
+        debugPrint('[StudyEventProvider] ✅ Event removed from state.');
       }
       return success;
     } catch (e) {
-      debugPrint('Error deleting event: $e');
+      debugPrint('[StudyEventProvider] ❌ Error deleting event: $e');
       return false;
+    } finally {
+      _setLoading(false);
     }
   }
 

@@ -474,39 +474,28 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         reminderMinutes: _reminderMinutes,
       );
 
-      final calendarService = GoogleCalendarService();
-      final eventId = await calendarService.createEvent(event);
+      // CRITICAL FIX: Only call the provider.
+      // The provider/repository logic now handles the Google Calendar sync.
+      await context.read<StudyEventProvider>().addEvent(event);
 
-      if (eventId != null) {
-        final updatedEvent = event.copyWith(
-          calendarEventId: eventId,
-          syncedWithCalendar: true,
-        );
-        if (mounted) {
-          context.read<StudyEventProvider>().addEvent(updatedEvent);
-          SnackbarHelper.showSuccess(
-              context, 'Evento salvo no Google Calendar! 🗓️');
-          
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            _titleController.clear();
-            _descriptionController.clear();
-            setState(() {
-              _selectedSubject = AppConstants.defaultSubjects.first;
-              _selectedDate = DateTime.now();
-            });
-            _formKey.currentState?.reset();
-          }
-        }
-      } else {
-        if (mounted) {
-          SnackbarHelper.showError(context, 'Erro ao criar evento no Calendar');
+      if (mounted) {
+        SnackbarHelper.showSuccess(context, 'Evento salvo e sincronizado com sucesso! 🗓️');
+        
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else {
+          _titleController.clear();
+          _descriptionController.clear();
+          setState(() {
+            _selectedSubject = AppConstants.defaultSubjects.first;
+            _selectedDate = DateTime.now();
+          });
+          _formKey.currentState?.reset();
         }
       }
     } catch (e) {
       if (mounted) {
-        SnackbarHelper.showError(context, 'Erro inesperado: $e');
+        SnackbarHelper.showError(context, 'Erro ao criar evento: $e');
       }
     } finally {
       if (mounted) {

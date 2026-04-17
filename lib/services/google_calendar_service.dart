@@ -8,12 +8,41 @@ import 'package:study_hub/config/app_constants.dart';
 class GoogleCalendarService {
   final AuthService _authService = AuthService();
 
+  // Static guard to prevent duplicate requests from any part of the app
+  static final Map<String, DateTime> _recentRequests = {};
+  static const Duration _duplicateWindow = Duration(seconds: 10);
+
+  /// Checks if a request for the same event was sent very recently.
+  bool _isDuplicate(StudyEvent event) {
+    final key = '${event.title}_${event.startDateTime.toIso8601String()}';
+    final now = DateTime.now();
+    
+    if (_recentRequests.containsKey(key)) {
+      final lastRequestTime = _recentRequests[key]!;
+      if (now.difference(lastRequestTime) < _duplicateWindow) {
+        return true;
+      }
+    }
+    
+    _recentRequests[key] = now;
+    // Cleanup old requests periodically
+    _recentRequests.removeWhere((_, time) => now.difference(time) > _duplicateWindow);
+    return false;
+  }
+
   /// Creates a calendar event based on the [StudyEvent] model.
   Future<String?> createEvent(StudyEvent event) async {
+    final timestamp = DateTime.now().toIso8601String();
+    debugPrint('[$timestamp] [GoogleCalendarService] 🛫 Starting event creation for: ${event.title}');
+    
+    if (_isDuplicate(event)) {
+      debugPrint('[$timestamp] [GoogleCalendarService] 🛡️ BLOCKING DUPLICATE REQUEST for: ${event.title}');
+      return null;
+    }
     try {
       final client = await _authService.getAuthenticatedClient();
       if (client == null) {
-        debugPrint('[GoogleCalendarService] User not authenticated.');
+        debugPrint('[GoogleCalendarService] ❌ Authentication failed.');
         return null;
       }
 
@@ -28,7 +57,6 @@ class GoogleCalendarService {
         dateTime: event.endDateTime.toUtc(),
       );
 
-      // Configure native mobile reminders
       final reminders = calendar.EventReminders(
         useDefault: false,
         overrides: [
@@ -45,7 +73,7 @@ class GoogleCalendarService {
         start: startDateTime,
         end: endDateTime,
         reminders: reminders,
-        colorId: '2', // Sage (Green)
+        colorId: '2', 
       );
 
       final createdEvent = await calendarApi.events.insert(
@@ -53,31 +81,32 @@ class GoogleCalendarService {
         AppConstants.calendarId,
       );
 
-      debugPrint('[GoogleCalendarService] Event created. ID: ${createdEvent.id}');
+      debugPrint('[GoogleCalendarService] ✅ Event successfully created. ID: ${createdEvent.id}');
       return createdEvent.id;
     } catch (e) {
-      debugPrint('[GoogleCalendarService] Error creating event: $e');
+      debugPrint('[GoogleCalendarService] ❌ CRITICAL ERROR creating event: $e');
       return null;
     }
   }
 
   /// Removes an event from the user's primary Google Calendar.
   Future<bool> deleteEvent(String googleEventId) async {
+    debugPrint('[GoogleCalendarService] 🗑️ Attempting to delete event: $googleEventId');
     try {
       final client = await _authService.getAuthenticatedClient();
       if (client == null) {
-        debugPrint('[GoogleCalendarService] Authentication failure during deletion.');
+        debugPrint('[GoogleCalendarService] ❌ Auth failure during deletion.');
         return false;
       }
 
       final calendarApi = calendar.CalendarApi(client);
       
       await calendarApi.events.delete(AppConstants.calendarId, googleEventId);
-      debugPrint('[GoogleCalendarService] Delete command successful.');
+      debugPrint('[GoogleCalendarService] ✅ Event deleted from Google Calendar.');
 
       return true;
     } catch (e) {
-      debugPrint('[GoogleCalendarService] Error deleting event: $e');
+      debugPrint('[GoogleCalendarService] ❌ ERROR deleting event: $e');
       return false;
     }
   }

@@ -38,7 +38,7 @@ class _StudyCardState extends State<StudyCard> with SingleTickerProviderStateMix
       duration: const Duration(milliseconds: 80),
     );
 
-    _wiggleAnimation = Tween<double>(begin: -0.01, end: 0.01).animate(
+    _wiggleAnimation = Tween<double>(begin: 0.0, end: 0.01).animate(
       CurvedAnimation(parent: _wiggleController, curve: Curves.easeInOut),
     );
   }
@@ -79,34 +79,37 @@ class _StudyCardState extends State<StudyCard> with SingleTickerProviderStateMix
     _wiggleController.reset();
 
     if (confirm == true) {
-      final success = await provider.deleteEvent(widget.event);
-      
-      if (!success && mounted) {
-        // Falha na sincronização do Google
-        final forceDelete = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Erro de Sincronização'),
-            content: const Text('Não foi possível excluir o evento no Google Calendar. Deseja excluir apenas localmente?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Manter'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Excluir apenas local'),
-              ),
-            ],
-          ),
-        );
+      if (mounted) {
+        final success = await provider.deleteEvent(widget.event);
+        
+        if (!success && mounted) {
+          // Sync failure handling
+          final forceDelete = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Sync Issue'),
+              content: const Text('Could not delete from Google Calendar. Remove locally anyway?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Keep'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Delete Locally'),
+                ),
+              ],
+            ),
+          );
 
-        if (forceDelete == true) {
-          provider.removeEvent(widget.event.id);
-          if (mounted) SnackbarHelper.showInfo(context, 'Removido apenas localmente');
+          if (forceDelete == true && mounted) {
+            provider.removeEvent(widget.event.id);
+            SnackbarHelper.showInfo(context, 'Removed locally.');
+          }
+        } else if (mounted) {
+          SnackbarHelper.showSuccess(context, 'Event deleted successfully!');
         }
-      } else if (mounted) {
-        SnackbarHelper.showSuccess(context, 'Evento removido com sucesso!');
       }
     }
   }
