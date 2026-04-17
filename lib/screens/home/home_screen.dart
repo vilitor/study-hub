@@ -4,6 +4,7 @@ import 'package:study_hub/config/app_theme.dart';
 import 'package:study_hub/config/app_routes.dart';
 import 'package:study_hub/providers/study_event_provider.dart';
 import 'package:study_hub/providers/study_log_provider.dart';
+import 'package:study_hub/providers/settings_provider.dart';
 import 'package:study_hub/utils/date_helpers.dart';
 import 'package:study_hub/widgets/weekly_calendar.dart';
 import 'package:study_hub/widgets/study_card.dart';
@@ -54,42 +55,106 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  /// Header com saudação personalizada
+  /// Header com saudação personalizada e foto do usuário
   Widget _buildHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        final userName = settings.settings.userName;
+        final photoUrl = settings.settings.userPhotoUrl;
+        
+        // Extrai apenas o primeiro nome
+        final firstName = (userName != null && userName.isNotEmpty)
+            ? userName.split(' ')[0]
+            : 'Estudante';
+
+        // Define a saudação baseada na hora do dia
+        final hour = DateTime.now().hour;
+        String greeting;
+        if (hour < 12) {
+          greeting = 'Bom dia';
+        } else if (hour < 18) {
+          greeting = 'Boa tarde';
+        } else {
+          greeting = 'Boa noite';
+        }
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              '${DateHelpers.getGreeting()} 👋',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$greeting 👋',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  firstName,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Victor',
-              style: Theme.of(context).textTheme.headlineMedium,
+            // Avatar dinâmico
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primaryGreen.withValues(alpha: 0.3),
+                  width: 2,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: (photoUrl != null && photoUrl.isNotEmpty)
+                    ? Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildFallbackAvatar(firstName),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primaryGreen),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : _buildFallbackAvatar(firstName),
+              ),
             ),
           ],
-        ),
-        // Avatar / ícone de perfil
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.primaryGreen.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.person_rounded,
+        );
+      },
+    );
+  }
+
+  /// Avatar de fallback com iniciais ou ícone padrão
+  Widget _buildFallbackAvatar(String name) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return Container(
+      color: AppColors.primaryGreen.withValues(alpha: 0.15),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
             color: AppColors.primaryGreen,
-            size: 28,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
         ),
-      ],
+      ),
     );
   }
 

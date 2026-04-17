@@ -112,6 +112,36 @@ class StorageService {
     );
   }
 
+  /// Encrypts and saves the Google User Name.
+  Future<void> saveGoogleName(String name) async {
+    await _secureStorage.write(
+      key: AppConstants.storageKeyGoogleName,
+      value: name,
+    );
+  }
+
+  /// Retrieves the encrypted Google User Name.
+  Future<String?> getGoogleName() async {
+    return await _secureStorage.read(
+      key: AppConstants.storageKeyGoogleName,
+    );
+  }
+
+  /// Encrypts and saves the Google Photo URL.
+  Future<void> saveGooglePhotoUrl(String url) async {
+    await _secureStorage.write(
+      key: AppConstants.storageKeyGooglePhoto,
+      value: url,
+    );
+  }
+
+  /// Retrieves the encrypted Google Photo URL.
+  Future<String?> getGooglePhotoUrl() async {
+    return await _secureStorage.read(
+      key: AppConstants.storageKeyGooglePhoto,
+    );
+  }
+
   /// Clears all entries in Secure Storage (used for full sign-out).
   Future<void> clearSecureStorage() async {
     await _secureStorage.deleteAll();

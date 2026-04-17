@@ -5,6 +5,8 @@ class AppSettings {
   final bool isNotionConnected;
   final String? notionDatabaseId;
   final String? googleEmail;
+  final String? userName;
+  final String? userPhotoUrl;
   final String themeMode; // "light", "dark", "system"
   final int defaultReminderMinutes;
 
@@ -13,6 +15,8 @@ class AppSettings {
     this.isNotionConnected = false,
     this.notionDatabaseId,
     this.googleEmail,
+    this.userName,
+    this.userPhotoUrl,
     this.themeMode = 'system',
     this.defaultReminderMinutes = 15,
   });
@@ -23,6 +27,8 @@ class AppSettings {
     bool? isNotionConnected,
     String? notionDatabaseId,
     String? googleEmail,
+    String? userName,
+    String? userPhotoUrl,
     String? themeMode,
     int? defaultReminderMinutes,
   }) {
@@ -31,6 +37,8 @@ class AppSettings {
       isNotionConnected: isNotionConnected ?? this.isNotionConnected,
       notionDatabaseId: notionDatabaseId ?? this.notionDatabaseId,
       googleEmail: googleEmail ?? this.googleEmail,
+      userName: userName ?? this.userName,
+      userPhotoUrl: userPhotoUrl ?? this.userPhotoUrl,
       themeMode: themeMode ?? this.themeMode,
       defaultReminderMinutes:
           defaultReminderMinutes ?? this.defaultReminderMinutes,

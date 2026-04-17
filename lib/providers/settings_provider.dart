@@ -27,6 +27,8 @@ class SettingsProvider extends ChangeNotifier {
 
     try {
       final googleEmail = await _storage.getGoogleEmail();
+      final googleName = await _storage.getGoogleName();
+      final googlePhoto = await _storage.getGooglePhotoUrl();
       final notionToken = await _storage.getNotionToken();
       final notionDbId = await _storage.getNotionDatabaseId();
       final themeMode = await _storage.getThemeMode();
@@ -37,6 +39,8 @@ class SettingsProvider extends ChangeNotifier {
         isNotionConnected: notionToken != null && notionToken.isNotEmpty,
         notionDatabaseId: notionDbId,
         googleEmail: googleEmail,
+        userName: googleName,
+        userPhotoUrl: googlePhoto,
         themeMode: themeMode,
         defaultReminderMinutes: defaultReminder,
       );
@@ -82,7 +86,11 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final account = await _authRepository.login();
       if (account != null) {
-        await setGoogleConnected(account.email);
+        await setGoogleConnected(
+          account.email,
+          account.displayName ?? '',
+          account.photoUrl ?? '',
+        );
       }
     } catch (e) {
       debugPrint('Connection error: $e');
@@ -93,12 +101,16 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   /// Manually synchronizes the local Google connection state.
-  Future<void> setGoogleConnected(String email) async {
+  Future<void> setGoogleConnected(String email, String name, String photoUrl) async {
     await _storage.saveGoogleEmail(email);
+    await _storage.saveGoogleName(name);
+    await _storage.saveGooglePhotoUrl(photoUrl);
 
     _settings = _settings.copyWith(
       isGoogleConnected: true,
       googleEmail: email,
+      userName: name,
+      userPhotoUrl: photoUrl,
     );
     notifyListeners();
   }
@@ -110,10 +122,14 @@ class SettingsProvider extends ChangeNotifier {
     try {
       await _authRepository.logout();
       await _storage.saveGoogleEmail('');
+      await _storage.saveGoogleName('');
+      await _storage.saveGooglePhotoUrl('');
 
       _settings = _settings.copyWith(
         isGoogleConnected: false,
         googleEmail: null,
+        userName: null,
+        userPhotoUrl: null,
       );
     } catch (e) {
       debugPrint('Logout error: $e');

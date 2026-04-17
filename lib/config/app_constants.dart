@@ -28,6 +28,8 @@ class AppConstants {
   static const String storageKeyNotionToken = 'notion_token';
   static const String storageKeyNotionDatabaseId = 'notion_database_id';
   static const String storageKeyGoogleEmail = 'google_email';
+  static const String storageKeyGoogleName = 'google_user_name';
+  static const String storageKeyGooglePhoto = 'google_user_photo';
 
   // ── Simple Preference Keys ──
   static const String prefKeyThemeMode = 'theme_mode';
