@@ -5,7 +5,6 @@ import 'package:study_hub/config/app_constants.dart';
 import 'package:study_hub/models/study_event.dart';
 import 'package:study_hub/providers/study_event_provider.dart';
 import 'package:study_hub/providers/settings_provider.dart';
-import 'package:study_hub/services/google_calendar_service.dart';
 import 'package:study_hub/widgets/custom_text_field.dart';
 import 'package:study_hub/widgets/custom_button.dart';
 import 'package:study_hub/utils/validators.dart';

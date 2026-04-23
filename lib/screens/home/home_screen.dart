@@ -5,9 +5,12 @@ import 'package:study_hub/config/app_routes.dart';
 import 'package:study_hub/providers/study_event_provider.dart';
 import 'package:study_hub/providers/study_log_provider.dart';
 import 'package:study_hub/providers/settings_provider.dart';
+import 'package:study_hub/providers/goal_provider.dart';
 import 'package:study_hub/utils/date_helpers.dart';
 import 'package:study_hub/widgets/weekly_calendar.dart';
 import 'package:study_hub/widgets/study_card.dart';
+import 'package:study_hub/widgets/goal_card.dart';
+import 'package:study_hub/screens/home/create_goal_sheet.dart';
 
 /// Tela Inicial — Resumo do dia com calendário semanal e eventos
 class HomeScreen extends StatelessWidget {
@@ -36,6 +39,11 @@ class HomeScreen extends StatelessWidget {
 
               // ── Calendário semanal ──
               _buildCalendarSection(context),
+
+              const SizedBox(height: 24),
+
+              // ── Metas ──
+              _buildGoalsSection(context),
 
               const SizedBox(height: 24),
 
@@ -390,13 +398,13 @@ class HomeScreen extends StatelessWidget {
             Expanded(
               child: _QuickActionButton(
                 icon: Icons.add_circle_rounded,
-                label: 'Criar Evento',
+                label: 'Evento',
                 color: AppColors.primaryGreen,
                 onTap: () =>
                     Navigator.pushNamed(context, AppRoutes.createEvent),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: _QuickActionButton(
                 icon: Icons.edit_note_rounded,
@@ -406,10 +414,132 @@ class HomeScreen extends StatelessWidget {
                     Navigator.pushNamed(context, AppRoutes.studyLog),
               ),
             ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.history_rounded,
+                label: 'Histórico',
+                color: AppColors.coral,
+                onTap: () =>
+                    Navigator.pushNamed(context, AppRoutes.history),
+              ),
+            ),
           ],
         ),
       ],
     );
+  }
+
+  /// Seção de Metas (Goals)
+  Widget _buildGoalsSection(BuildContext context) {
+    return Consumer2<GoalProvider, StudyLogProvider>(
+      builder: (context, goalProvider, logProvider, _) {
+        final weeklyGoal = goalProvider.activeWeeklyGoal;
+        final monthlyGoal = goalProvider.activeMonthlyGoal;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Suas Metas',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_circle_rounded,
+                    color: AppColors.primaryGreen,
+                  ),
+                  onPressed: () => CreateGoalSheet.show(context),
+                ),
+              ],
+            ),
+            if (weeklyGoal == null && monthlyGoal == null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardGrey),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.flag_circle_rounded,
+                      size: 40,
+                      color: AppColors.textHint.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Nenhuma meta definida',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textHint,
+                          ),
+                    ),
+                    TextButton(
+                      onPressed: () => CreateGoalSheet.show(context),
+                      child: const Text('Criar Meta'),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              if (weeklyGoal != null)
+                GoalCard(
+                  goal: weeklyGoal,
+                  progress: goalProvider.calculateProgress(
+                      weeklyGoal, logProvider.logs),
+                  studiedMinutes: goalProvider.getStudiedMinutes(
+                      weeklyGoal, logProvider.logs),
+                  onEdit: () =>
+                      CreateGoalSheet.show(context, goal: weeklyGoal),
+                  onDelete: () => _confirmDeleteGoal(context, weeklyGoal),
+                ),
+              if (monthlyGoal != null)
+                GoalCard(
+                  goal: monthlyGoal,
+                  progress: goalProvider.calculateProgress(
+                      monthlyGoal, logProvider.logs),
+                  studiedMinutes: goalProvider.getStudiedMinutes(
+                      monthlyGoal, logProvider.logs),
+                  onEdit: () =>
+                      CreateGoalSheet.show(context, goal: monthlyGoal),
+                  onDelete: () => _confirmDeleteGoal(context, monthlyGoal),
+                ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteGoal(BuildContext context, dynamic goal) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir Meta?'),
+        content: const Text('Você tem certeza que deseja excluir esta meta?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<GoalProvider>().deleteGoal(goal.id);
+    }
   }
 }
 

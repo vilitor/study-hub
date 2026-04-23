@@ -1,14 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:study_hub/models/study_log.dart';
 import 'package:study_hub/models/study_event.dart';
-import 'package:study_hub/services/notion_service.dart';
 import 'package:study_hub/services/storage_service.dart';
 import 'package:study_hub/services/google_calendar_service.dart';
 
 /// Repository that orchestrates Study-related data operations
 /// Handles the layer between raw Services and UI Providers (Clean Architecture)
 class StudyRepository {
-  final NotionService _notionService = NotionService();
   final StorageService _storageService = StorageService();
   final GoogleCalendarService _googleCalendarService = GoogleCalendarService();
 
@@ -18,11 +16,17 @@ class StudyRepository {
   Future<bool> saveLog(StudyLog log) async {
     // 1. Save locally first (Reliability)
     final currentLogs = await _storageService.getStudyLogs();
-    currentLogs.add(log);
+    // Replace if same ID exists, otherwise add
+    final existingIndex = currentLogs.indexWhere((l) => l.id == log.id);
+    if (existingIndex != -1) {
+      currentLogs[existingIndex] = log;
+    } else {
+      currentLogs.add(log);
+    }
     await _storageService.saveStudyLogs(currentLogs);
 
-    // 2. Effort to sync with Notion
-    return await _notionService.createStudyLog(log);
+    // 2. Notion sync is now handled by the caller (page ID capture)
+    return true;
   }
 
   /// Removes a log locally

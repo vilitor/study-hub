@@ -7,7 +7,8 @@ class StudyLog {
   // Guarda temporariamente os valores antes de subir para nuvem (Chave = Nome da Propriedade, Valor = dynamic)
   final Map<String, dynamic> rawValues;
   final bool syncedWithNotion;
-  final NotionDatabaseSchema schema; // Precisamos do Schema para montar o payload com segurança
+  final String? notionPageId; // Notion page ID for deletion sync
+  final NotionDatabaseSchema schema;
   final DateTime date;
 
   StudyLog({
@@ -15,6 +16,7 @@ class StudyLog {
     required this.rawValues,
     required this.schema,
     this.syncedWithNotion = false,
+    this.notionPageId,
     DateTime? date,
   })  : id = id ?? const Uuid().v4(),
         date = date ?? DateTime.now();
@@ -22,6 +24,7 @@ class StudyLog {
   StudyLog copyWith({
     Map<String, dynamic>? rawValues,
     bool? syncedWithNotion,
+    String? notionPageId,
     NotionDatabaseSchema? schema,
     DateTime? date,
   }) {
@@ -29,6 +32,7 @@ class StudyLog {
       id: id,
       rawValues: rawValues ?? this.rawValues,
       syncedWithNotion: syncedWithNotion ?? this.syncedWithNotion,
+      notionPageId: notionPageId ?? this.notionPageId,
       schema: schema ?? this.schema,
       date: date ?? this.date,
     );
@@ -120,6 +124,7 @@ class StudyLog {
       'id': id,
       'rawValues': rawValues,
       'syncedWithNotion': syncedWithNotion,
+      'notionPageId': notionPageId,
       'schema': schema.toJson(),
       'date': date.toIso8601String(),
     };
@@ -131,6 +136,7 @@ class StudyLog {
       id: map['id'] as String,
       rawValues: Map<String, dynamic>.from(map['rawValues'] as Map),
       syncedWithNotion: map['syncedWithNotion'] as bool? ?? false,
+      notionPageId: map['notionPageId'] as String?,
       schema: NotionDatabaseSchema.fromJson(map['schema'] as Map<String, dynamic>),
       date: DateTime.parse(map['date'] as String),
     );

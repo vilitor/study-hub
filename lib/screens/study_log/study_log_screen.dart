@@ -7,6 +7,7 @@ import 'package:study_hub/providers/settings_provider.dart';
 import 'package:study_hub/services/notion_service.dart';
 import 'package:study_hub/widgets/dynamic_form_builder.dart';
 import 'package:study_hub/widgets/custom_button.dart';
+import 'package:study_hub/widgets/study_timer_widget.dart';
 import 'package:study_hub/utils/snackbar_helper.dart';
 
 class StudyLogScreen extends StatefulWidget {
@@ -57,6 +58,12 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ── Study Timer ──
+                    StudyTimerWidget(
+                      onTimerStopped: (minutes) => _onTimerStopped(minutes, schema),
+                    ),
+                    const SizedBox(height: 24),
+
                     Text(
                       'Preencha os dados do Notion',
                       style: Theme.of(context).textTheme.titleMedium,
@@ -138,6 +145,26 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     );
   }
 
+  /// Called when the timer is stopped — auto-fills the first number field.
+  void _onTimerStopped(int minutes, dynamic schema) {
+    if (schema == null || minutes <= 0) return;
+
+    // Find the first 'number' property in the schema to populate
+    final numberProp = schema.properties.entries
+        .where((e) => e.value.type == 'number')
+        .firstOrNull;
+
+    if (numberProp != null) {
+      setState(() {
+        _dynamicFormValues[numberProp.value.name] = minutes;
+      });
+      SnackbarHelper.showSuccess(
+        context,
+        'Tempo preenchido: ${minutes}min ⏱️',
+      );
+    }
+  }
+
   Future<void> _saveToNotion(dynamic schema) async {
     // Validações básicas (os FormBuilders tratam inputs nativos)
     if (!_formKey.currentState!.validate()) return;
@@ -159,15 +186,18 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     try {
       // Cria o StudyLog usando nosso novo Data Model Dinâmico
       final log = StudyLog(
-        rawValues: _dynamicFormValues,
+        rawValues: Map<String, dynamic>.from(_dynamicFormValues),
         schema: schema,
       );
 
       final notionService = NotionService();
-      final success = await notionService.createStudyLog(log);
+      final pageId = await notionService.createStudyLog(log);
 
-      if (success) {
-        final updatedLog = log.copyWith(syncedWithNotion: true);
+      if (pageId != null) {
+        final updatedLog = log.copyWith(
+          syncedWithNotion: true,
+          notionPageId: pageId,
+        );
         if (mounted) {
           context.read<StudyLogProvider>().addLog(updatedLog);
           SnackbarHelper.showSuccess(context, 'Registro salvo no Notion com sucesso! 📓');
@@ -183,7 +213,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
         if (mounted) {
           setState(() => _isSaving = false);
         }
-        return; // Safely exit before setState after disposed
+        return;
       } else {
         if (mounted) {
           SnackbarHelper.showError(context, 'Erro ao salvar no Notion. Verifique o console.');

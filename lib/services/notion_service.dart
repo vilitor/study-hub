@@ -24,14 +24,15 @@ class NotionService {
   }
 
   /// Creates a new study log entry in the configured Notion database.
-  Future<bool> createStudyLog(StudyLog log) async {
+  /// Returns the page ID on success, or null on failure.
+  Future<String?> createStudyLog(StudyLog log) async {
     try {
       final headers = await _getHeaders();
       final databaseId = await _storage.getNotionDatabaseId();
 
       if (headers == null || databaseId == null || databaseId.isEmpty) {
         debugPrint('[NotionService] Token or Database ID not configured.');
-        return false;
+        return null;
       }
 
       final payload = log.toNotionPayload(databaseId);
@@ -43,13 +44,39 @@ class NotionService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
+        final body = jsonDecode(response.body);
+        return body['id'] as String?;
       } else {
         debugPrint('[NotionService] Failed to create page. Status: ${response.statusCode}');
-        return false;
+        return null;
       }
     } catch (e) {
       debugPrint('[NotionService] Exception during log creation: $e');
+      return null;
+    }
+  }
+
+  /// Archives (soft-deletes) a Notion page by its ID.
+  Future<bool> archivePage(String pageId) async {
+    try {
+      final headers = await _getHeaders();
+      if (headers == null) return false;
+
+      final response = await http.patch(
+        Uri.parse('$_notionApiBaseUrl/pages/$pageId'),
+        headers: headers,
+        body: jsonEncode({'archived': true}),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('[NotionService] ✅ Page $pageId archived.');
+        return true;
+      } else {
+        debugPrint('[NotionService] ❌ Failed to archive page. Status: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('[NotionService] Exception archiving page: $e');
       return false;
     }
   }

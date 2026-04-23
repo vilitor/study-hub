@@ -96,6 +96,24 @@ class StudyLogProvider extends ChangeNotifier {
     }
   }
 
+  /// Removes a log locally AND archives it in Notion (if synced).
+  Future<bool> deleteLogWithNotionSync(String logId) async {
+    final log = _logs.where((l) => l.id == logId).firstOrNull;
+    if (log == null) return false;
+
+    // Archive in Notion first if we have a page ID
+    if (log.notionPageId != null && log.notionPageId!.isNotEmpty) {
+      final notionService = NotionService();
+      final archived = await notionService.archivePage(log.notionPageId!);
+      if (!archived) {
+        debugPrint('[StudyLogProvider] ⚠️ Notion archive failed, removing locally anyway.');
+      }
+    }
+
+    await removeLog(logId);
+    return true;
+  }
+
   // ── Notion Schema Management ──
 
   /// Loads the pre-existing schema from local cache.

@@ -8,11 +8,14 @@ import 'package:study_hub/config/app_routes.dart';
 import 'package:study_hub/providers/study_event_provider.dart';
 import 'package:study_hub/providers/study_log_provider.dart';
 import 'package:study_hub/providers/settings_provider.dart';
+import 'package:study_hub/providers/study_timer_provider.dart';
+import 'package:study_hub/providers/goal_provider.dart';
 import 'package:study_hub/screens/home/home_screen.dart';
 import 'package:study_hub/screens/create_event/create_event_screen.dart';
 import 'package:study_hub/screens/study_log/study_log_screen.dart';
 import 'package:study_hub/screens/settings/settings_screen.dart';
-import 'package:study_hub/widgets/floating_nav_bar.dart'; // [IMPORT]
+import 'package:study_hub/widgets/floating_nav_bar.dart';
+import 'package:study_hub/widgets/floating_timer_bar.dart';
 
 /// Ponto de entrada do app StudyHub
 void main() async {
@@ -46,6 +49,8 @@ class StudyHubApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StudyEventProvider()),
         ChangeNotifierProvider(create: (_) => StudyLogProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()..loadSettings()),
+        ChangeNotifierProvider(create: (_) => StudyTimerProvider()),
+        ChangeNotifierProvider(create: (_) => GoalProvider()),
       ],
       child: MaterialApp(
         title: 'StudyHub',
@@ -106,12 +111,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         }
       },
       child: Scaffold(
-        extendBody: true, // Permite que o conteúdo apareça atrás da barra flutuante
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _screens,
+        extendBody: true,
+        body: Stack(
+          children: [
+            IndexedStack(
+              index: _currentIndex,
+              children: _screens,
+            ),
+            // Floating timer bar — appears above nav when timer is active
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: FloatingTimerBar(),
+            ),
+          ],
         ),
-  
+
         // Barra de Navegação Flutuante Premium
         bottomNavigationBar: FloatingNavBar(
           currentIndex: _currentIndex,

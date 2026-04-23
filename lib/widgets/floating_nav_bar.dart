@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:study_hub/config/app_theme.dart';
 
 /// Item data for the FloatingNavBar
 class NavItem {
