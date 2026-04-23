@@ -14,6 +14,7 @@ import 'package:study_hub/screens/home/home_screen.dart';
 import 'package:study_hub/screens/create_event/create_event_screen.dart';
 import 'package:study_hub/screens/study_log/study_log_screen.dart';
 import 'package:study_hub/screens/settings/settings_screen.dart';
+import 'package:study_hub/screens/history/registration_history_screen.dart';
 import 'package:study_hub/widgets/floating_nav_bar.dart';
 import 'package:study_hub/widgets/floating_timer_bar.dart';
 
@@ -67,6 +68,7 @@ class StudyHubApp extends StatelessWidget {
           AppRoutes.createEvent: (context) => const CreateEventScreen(),
           AppRoutes.studyLog: (context) => const StudyLogScreen(),
           AppRoutes.settings: (context) => const SettingsScreen(),
+          AppRoutes.history: (context) => const RegistrationHistoryScreen(),
         },
       ),
     );

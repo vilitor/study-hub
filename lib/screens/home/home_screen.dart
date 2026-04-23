@@ -185,6 +185,9 @@ class HomeScreen extends StatelessWidget {
                 label: isToday ? 'Eventos hoje' : 'Eventos',
                 value: '${events.length}',
                 color: AppColors.primaryGreen,
+                onTap: () {
+                  // Pode rolar a página até a lista de eventos
+                },
               ),
             ),
             const SizedBox(width: 12),
@@ -205,6 +208,7 @@ class HomeScreen extends StatelessWidget {
                 label: isToday ? 'Registros' : 'Registros',
                 value: '$logsCount',
                 color: AppColors.coral,
+                onTap: () => Navigator.pushNamed(context, AppRoutes.history),
               ),
             ),
           ],
@@ -549,26 +553,44 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final VoidCallback? onTap;
 
   const _StatCard({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 22),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Icon(icon, color: color, size: 22),
+                  if (onTap != null)
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 10,
+                      color: color.withValues(alpha: 0.5),
+                    ),
+                ],
+              ),
           const SizedBox(height: 8),
           Text(
             value,
@@ -589,7 +611,9 @@ class _StatCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -614,7 +638,7 @@ class _QuickActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(16),
@@ -627,32 +651,29 @@ class _QuickActionButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 22),
+              child: Icon(icon, color: color, size: 26),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: AppColors.textHint,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
