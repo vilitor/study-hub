@@ -59,6 +59,12 @@ class StudyHubApp extends StatelessWidget {
 
         // Tema visual do app
         theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: context.watch<SettingsProvider>().themeMode == 'dark'
+            ? ThemeMode.dark
+            : context.watch<SettingsProvider>().themeMode == 'light'
+                ? ThemeMode.light
+                : ThemeMode.system,
 
         // Tela inicial com navegação por abas
         home: const MainNavigationScreen(),

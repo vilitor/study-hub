@@ -10,6 +10,7 @@ import 'package:study_hub/utils/date_helpers.dart';
 import 'package:study_hub/widgets/weekly_calendar.dart';
 import 'package:study_hub/widgets/study_card.dart';
 import 'package:study_hub/widgets/goal_card.dart';
+import 'package:study_hub/widgets/streak_badge.dart';
 import 'package:study_hub/screens/home/create_goal_sheet.dart';
 
 /// Tela Inicial — Resumo do dia com calendário semanal e eventos
@@ -105,10 +106,19 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
             ),
-            // Avatar dinâmico
-            Container(
-              width: 52,
-              height: 52,
+            Row(
+              children: [
+                // Streak Badge
+                Consumer<StudyLogProvider>(
+                  builder: (context, logProvider, _) {
+                    return StreakBadge(streakCount: logProvider.currentStreak);
+                  },
+                ),
+                const SizedBox(width: 12),
+                // Avatar dinâmico
+                Container(
+                  width: 52,
+                  height: 52,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -142,6 +152,8 @@ class HomeScreen extends StatelessWidget {
                     : _buildFallbackAvatar(firstName),
               ),
             ),
+            ],
+          ),
           ],
         );
       },

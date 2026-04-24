@@ -18,6 +18,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isGoogleConnected => _settings.isGoogleConnected;
   bool get isNotionConnected => _settings.isNotionConnected;
+  String get themeMode => _settings.themeMode;
 
   // ── Initialization ──
 
@@ -140,10 +141,16 @@ class SettingsProvider extends ChangeNotifier {
 
   // ── Preferences Management ──
 
-  /// Updates the default time (minutes) for calendar event reminders.
   Future<void> setDefaultReminder(int minutes) async {
     await _storage.saveDefaultReminder(minutes);
     _settings = _settings.copyWith(defaultReminderMinutes: minutes);
+    notifyListeners();
+  }
+
+  /// Updates the theme mode (light, dark, system).
+  Future<void> setThemeMode(String mode) async {
+    await _storage.saveThemeMode(mode);
+    _settings = _settings.copyWith(themeMode: mode);
     notifyListeners();
   }
 

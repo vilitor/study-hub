@@ -35,6 +35,46 @@ class StudyLogProvider extends ChangeNotifier {
     return getLogsForDate(date).fold(0, (sum, log) => sum + log.studyTimeMinutes);
   }
 
+  /// Calculates the current streak of consecutive days studied.
+  int get currentStreak {
+    if (_logs.isEmpty) return 0;
+
+    // Extract unique dates (ignoring time)
+    final uniqueDates = _logs.map((l) => DateTime(l.date.year, l.date.month, l.date.day)).toSet().toList();
+    // Sort descending (newest first)
+    uniqueDates.sort((a, b) => b.compareTo(a));
+
+    int streak = 0;
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    DateTime currentDateToCheck = today;
+
+    // Check if there's a log for today
+    if (uniqueDates.contains(today)) {
+      streak = 1;
+      currentDateToCheck = today.subtract(const Duration(days: 1));
+    } else if (uniqueDates.contains(today.subtract(const Duration(days: 1)))) {
+      // If no log today, but there's one yesterday, streak continues from yesterday
+      streak = 1;
+      currentDateToCheck = today.subtract(const Duration(days: 2));
+    } else {
+      // No log today or yesterday -> streak broken
+      return 0;
+    }
+
+    // Count backwards for consecutive days
+    for (int i = 0; i < uniqueDates.length; i++) {
+      if (uniqueDates.contains(currentDateToCheck)) {
+        streak++;
+        currentDateToCheck = currentDateToCheck.subtract(const Duration(days: 1));
+      } else {
+        // Only break if we are checking days before the streak start
+        if (uniqueDates[i].isBefore(currentDateToCheck)) break;
+      }
+    }
+
+    return streak;
+  }
+
   // ── Life Cycle ──
 
   StudyLogProvider() {

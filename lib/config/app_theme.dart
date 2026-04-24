@@ -228,4 +228,151 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.primaryGreen,
+        brightness: Brightness.dark,
+        primary: AppColors.primaryGreen,
+        onPrimary: AppColors.white,
+        secondary: AppColors.coral,
+        surface: const Color(0xFF1E1E2D), // Dark surface
+        error: AppColors.error,
+      ),
+
+      scaffoldBackgroundColor: const Color(0xFF121212), // Dark background
+
+      textTheme: GoogleFonts.interTextTheme().copyWith(
+        headlineLarge: GoogleFonts.poppins(
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+        headlineMedium: GoogleFonts.poppins(
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        titleLarge: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        titleMedium: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        titleSmall: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textHint,
+        ),
+        bodyLarge: GoogleFonts.inter(
+          fontSize: 16,
+          color: Colors.white,
+        ),
+        bodyMedium: GoogleFonts.inter(
+          fontSize: 14,
+          color: Colors.white70,
+        ),
+        bodySmall: GoogleFonts.inter(
+          fontSize: 12,
+          color: AppColors.textHint,
+        ),
+      ),
+
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
+
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1E1E2D),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryGreen,
+          foregroundColor: AppColors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF2A2A3C), // Darker grey for inputs
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primaryGreen, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        ),
+        hintStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: AppColors.textHint,
+        ),
+        labelStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: Colors.white70,
+        ),
+      ),
+
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFF1E1E2D),
+        selectedItemColor: AppColors.primaryGreen,
+        unselectedItemColor: AppColors.textHint,
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+        showUnselectedLabels: true,
+      ),
+
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppColors.primaryGreen,
+        foregroundColor: AppColors.white,
+        elevation: 4,
+        shape: CircleBorder(),
+      ),
+
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFF2A2A3C),
+        thickness: 1,
+      ),
+    );
+  }
 }

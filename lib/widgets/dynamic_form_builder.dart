@@ -67,6 +67,7 @@ class DynamicFormBuilder extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: CustomTextField(
+        key: ValueKey(initialValue?.toString() ?? 'empty'),
         label: property.name,
         hint: '0',
         prefixIcon: Icons.numbers_rounded,

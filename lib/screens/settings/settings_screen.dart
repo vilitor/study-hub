@@ -77,6 +77,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 // ── Seção Google ──
                 Text(
+                  'Tema',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Modo Escuro',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    Switch(
+                      value: settings.themeMode == 'dark',
+                      activeThumbColor: AppColors.primaryGreen,
+                      onChanged: (isDark) {
+                        settings.setThemeMode(isDark ? 'dark' : 'light');
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Seção Google ──
+                Text(
                   'Google Calendar',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
