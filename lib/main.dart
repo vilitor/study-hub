@@ -53,28 +53,32 @@ class StudyHubApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StudyTimerProvider()),
         ChangeNotifierProvider(create: (_) => GoalProvider()),
       ],
-      child: MaterialApp(
-        title: 'StudyHub',
-        debugShowCheckedModeBanner: false,
+      child: Consumer<SettingsProvider>(
+        builder: (context, settings, _) {
+          return MaterialApp(
+            title: 'StudyHub',
+            debugShowCheckedModeBanner: false,
 
-        // Tema visual do app
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: context.watch<SettingsProvider>().themeMode == 'dark'
-            ? ThemeMode.dark
-            : context.watch<SettingsProvider>().themeMode == 'light'
-                ? ThemeMode.light
-                : ThemeMode.system,
+            // Tema visual do app
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: settings.themeMode == 'dark'
+                ? ThemeMode.dark
+                : settings.themeMode == 'light'
+                    ? ThemeMode.light
+                    : ThemeMode.system,
 
-        // Tela inicial com navegação por abas
-        home: const MainNavigationScreen(),
+            // Tela inicial com navegação por abas
+            home: const MainNavigationScreen(),
 
-        // Rotas nomeadas para navegação entre telas
-        routes: {
-          AppRoutes.createEvent: (context) => const CreateEventScreen(),
-          AppRoutes.studyLog: (context) => const StudyLogScreen(),
-          AppRoutes.settings: (context) => const SettingsScreen(),
-          AppRoutes.history: (context) => const RegistrationHistoryScreen(),
+            // Rotas nomeadas para navegação entre telas
+            routes: {
+              AppRoutes.createEvent: (context) => const CreateEventScreen(),
+              AppRoutes.studyLog: (context) => const StudyLogScreen(),
+              AppRoutes.settings: (context) => const SettingsScreen(),
+              AppRoutes.history: (context) => const RegistrationHistoryScreen(),
+            },
+          );
         },
       ),
     );

@@ -39,37 +39,32 @@ class StudyLogProvider extends ChangeNotifier {
   int get currentStreak {
     if (_logs.isEmpty) return 0;
 
-    // Extract unique dates (ignoring time)
-    final uniqueDates = _logs.map((l) => DateTime(l.date.year, l.date.month, l.date.day)).toSet().toList();
-    // Sort descending (newest first)
-    uniqueDates.sort((a, b) => b.compareTo(a));
+    // Extract unique dates (ignoring time) as DateTime objects at midnight
+    final uniqueDates = _logs
+        .map((l) => DateTime(l.date.year, l.date.month, l.date.day))
+        .toSet();
 
-    int streak = 0;
     final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    DateTime currentDateToCheck = today;
+    final yesterday = today.subtract(const Duration(days: 1));
 
-    // Check if there's a log for today
+    DateTime currentDateToCheck;
+    int streak = 0;
+
+    // Logic: If today has a log, start from today. 
+    // If not, check if yesterday has a log (maintain streak).
     if (uniqueDates.contains(today)) {
-      streak = 1;
-      currentDateToCheck = today.subtract(const Duration(days: 1));
-    } else if (uniqueDates.contains(today.subtract(const Duration(days: 1)))) {
-      // If no log today, but there's one yesterday, streak continues from yesterday
-      streak = 1;
-      currentDateToCheck = today.subtract(const Duration(days: 2));
+      currentDateToCheck = today;
+    } else if (uniqueDates.contains(yesterday)) {
+      currentDateToCheck = yesterday;
     } else {
-      // No log today or yesterday -> streak broken
+      // No logs today or yesterday -> streak broken
       return 0;
     }
 
-    // Count backwards for consecutive days
-    for (int i = 0; i < uniqueDates.length; i++) {
-      if (uniqueDates.contains(currentDateToCheck)) {
-        streak++;
-        currentDateToCheck = currentDateToCheck.subtract(const Duration(days: 1));
-      } else {
-        // Only break if we are checking days before the streak start
-        if (uniqueDates[i].isBefore(currentDateToCheck)) break;
-      }
+    // Count backwards as long as consecutive days exist in uniqueDates
+    while (uniqueDates.contains(currentDateToCheck)) {
+      streak++;
+      currentDateToCheck = currentDateToCheck.subtract(const Duration(days: 1));
     }
 
     return streak;
