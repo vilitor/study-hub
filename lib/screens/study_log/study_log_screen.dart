@@ -8,6 +8,7 @@ import 'package:study_hub/services/notion_service.dart';
 import 'package:study_hub/widgets/dynamic_form_builder.dart';
 import 'package:study_hub/widgets/custom_button.dart';
 import 'package:study_hub/widgets/study_timer_widget.dart';
+import 'package:study_hub/providers/study_timer_provider.dart';
 import 'package:study_hub/utils/snackbar_helper.dart';
 
 class StudyLogScreen extends StatefulWidget {
