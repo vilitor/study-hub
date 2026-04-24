@@ -76,6 +76,42 @@ flutter run
 
 ---
 
+---
+
+## 🏗️ GitHub Deployment Best Practices
+
+Follow these steps to publish this project correctly on your GitHub profile:
+
+### 1. Initialize & First Commit
+If not already initialized, run:
+```bash
+git init
+git add .
+git commit -m "feat: initial commit with premium study hub architecture"
+```
+
+### 2. Branch Strategy
+We recommend using a simple `main`/`develop` strategy:
+- `main`: Production-ready code.
+- `develop`: Ongoing feature development.
+
+### 3. Remote Setup
+Create a new repository on GitHub and link it:
+```bash
+git remote add origin https://github.com/your-username/study_hub.git
+git branch -M main
+git push -u origin main
+```
+
+### 4. Conventional Commits
+Maintain professional history using [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat`: New feature
+- `fix`: Bug fix
+- `chore`: Maintenance/Refactor
+- `docs`: Documentation updates
+
+---
+
 ## 🚀 AI TERMINAL SETUP PROMPT (COPY & PASTE)
 
 > [!TIP]
@@ -96,3 +132,4 @@ Please perform the following steps:
 
 ## 📄 License
 Project developed for professional portfolio purposes. All rights reserved.
+
