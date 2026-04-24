@@ -73,7 +73,7 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
     return Container(
       height: 90,
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -120,7 +120,7 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
                                 ? Colors.white
                                 : isToday
                                     ? AppColors.coral
-                                    : AppColors.textHint,
+                                    : Theme.of(context).textTheme.bodySmall?.color,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -135,7 +135,7 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
                                 ? Colors.white
                                 : isToday
                                     ? AppColors.coral
-                                    : AppColors.textPrimary,
+                                    : Theme.of(context).textTheme.bodyLarge?.color,
                           ),
                         ),
                       ],

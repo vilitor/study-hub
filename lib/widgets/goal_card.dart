@@ -33,9 +33,9 @@ class GoalCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.cardGrey),
+          border: Border.all(color: Theme.of(context).dividerTheme.color ?? AppColors.cardGrey),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),

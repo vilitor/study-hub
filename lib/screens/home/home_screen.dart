@@ -22,7 +22,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(left: 20, right: 20, bottom: 110),
+          padding: const EdgeInsets.only(left: 20, right: 20, bottom: 140),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -96,7 +96,7 @@ class HomeScreen extends StatelessWidget {
                 Text(
                   '$greeting 👋',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                 ),
                 const SizedBox(height: 4),
@@ -354,10 +354,10 @@ class HomeScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: Theme.of(context).cardTheme.color,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.cardGrey,
+                    color: Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
                     width: 1,
                   ),
                 ),
@@ -372,14 +372,14 @@ class HomeScreen extends StatelessWidget {
                     Text(
                       'Nenhum evento neste dia',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textHint,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
                           ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Toque no botão + para criar um evento',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textHint,
+                            color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.8),
                           ),
                     ),
                   ],
@@ -477,9 +477,9 @@ class HomeScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: Theme.of(context).cardTheme.color,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.cardGrey),
+                  border: Border.all(color: Theme.of(context).dividerTheme.color ?? AppColors.cardGrey),
                 ),
                 child: Column(
                   children: [
@@ -492,7 +492,7 @@ class HomeScreen extends StatelessWidget {
                     Text(
                       'Nenhuma meta definida',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textHint,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
                           ),
                     ),
                     TextButton(
@@ -652,9 +652,9 @@ class _QuickActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.cardGrey, width: 1),
+          border: Border.all(color: Theme.of(context).dividerTheme.color ?? AppColors.cardGrey, width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -678,10 +678,9 @@ class _QuickActionButton extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               label,
-              style: const TextStyle(
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,

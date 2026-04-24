@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:study_hub/config/app_theme.dart';
@@ -22,26 +23,36 @@ class FloatingTimerBar extends StatelessWidget {
             opacity: timer.isActive ? 1.0 : 0.0,
             child: IgnorePointer(
               ignoring: !timer.isActive,
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.purple,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.purple.withValues(alpha: 0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // Pulsing dot indicator
-                    _PulsingDot(isRunning: timer.isRunning),
-                    const SizedBox(width: 10),
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 96),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.purple.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.purple.withValues(alpha: 0.3),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Pulsing dot indicator
+                            _PulsingDot(isRunning: timer.isRunning),
+                            const SizedBox(width: 10),
 
                     // Elapsed time
                     Text(
@@ -72,7 +83,11 @@ class FloatingTimerBar extends StatelessWidget {
                       color: AppColors.coral,
                       onTap: () => timer.stop(),
                     ),
-                  ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

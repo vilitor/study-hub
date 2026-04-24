@@ -24,7 +24,7 @@ class StudyTimerWidget extends StatelessWidget {
             gradient: LinearGradient(
               colors: timer.isActive
                   ? [AppColors.purple, AppColors.purple.withValues(alpha: 0.85)]
-                  : [AppColors.cardGrey, AppColors.cardGrey],
+                  : [Theme.of(context).cardTheme.color ?? AppColors.cardGrey, Theme.of(context).cardTheme.color ?? AppColors.cardGrey],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -47,7 +47,7 @@ class StudyTimerWidget extends StatelessWidget {
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 40,
                   fontWeight: FontWeight.w600,
-                  color: timer.isActive ? Colors.white : AppColors.textPrimary,
+                  color: timer.isActive ? Colors.white : Theme.of(context).textTheme.titleLarge?.color,
                   letterSpacing: 2,
                 ),
               ),
@@ -66,7 +66,7 @@ class StudyTimerWidget extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: timer.isActive
                       ? Colors.white.withValues(alpha: 0.8)
-                      : AppColors.textHint,
+                      : Theme.of(context).textTheme.bodySmall?.color,
                 ),
               ),
 

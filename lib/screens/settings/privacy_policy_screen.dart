@@ -23,9 +23,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'StudyHub is designed with transparency and security in mind. This screen explains how we handle your information in accordance with Data Protection best practices.',
-              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 16, color: Theme.of(context).textTheme.bodyMedium?.color),
             ),
             const SizedBox(height: 32),
             _buildSection(
@@ -85,7 +85,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   content,
-                  style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, height: 1.5),
+                  style: TextStyle(fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color, height: 1.5),
                 ),
               ],
             ),

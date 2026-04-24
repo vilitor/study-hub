@@ -45,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 110),
+            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 140),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -313,12 +313,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isConnected
               ? AppColors.success.withValues(alpha: 0.3)
-              : AppColors.cardGrey,
+              : Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
           width: 1.5,
         ),
       ),
@@ -330,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: BoxDecoration(
               color: isConnected
                   ? AppColors.success.withValues(alpha: 0.1)
-                  : AppColors.cardGrey,
+                  : Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(

@@ -12,6 +12,7 @@ class StudyTimerProvider extends ChangeNotifier {
   Duration _pausedElapsed = Duration.zero; // Accumulated before last pause
   bool _isRunning = false;
   bool _isPaused = false;
+  int _lastSessionMinutes = 0;
 
   // ── Persistence Keys ──
   static const String _keyStartTime = 'timer_start_time';
@@ -24,6 +25,7 @@ class StudyTimerProvider extends ChangeNotifier {
   bool get isPaused => _isPaused;
   bool get isActive => _isRunning || _isPaused;
   Duration get elapsed => _elapsed;
+  int get lastSessionMinutes => _lastSessionMinutes;
 
   /// Returns elapsed minutes as an integer (for Notion field population).
   int get elapsedMinutes => _elapsed.inMinutes;
@@ -101,6 +103,7 @@ class StudyTimerProvider extends ChangeNotifier {
     _pausedElapsed = Duration.zero;
     _isRunning = false;
     _isPaused = false;
+    _lastSessionMinutes = totalMinutes;
 
     _clearPersistence();
     notifyListeners();
@@ -111,6 +114,13 @@ class StudyTimerProvider extends ChangeNotifier {
   /// Discards the timer session without returning a value.
   void discard() {
     stop();
+    _lastSessionMinutes = 0;
+  }
+
+  /// Clears the last session minutes after it has been consumed.
+  void clearLastSession() {
+    _lastSessionMinutes = 0;
+    notifyListeners();
   }
 
   // ── Internal Ticker ──

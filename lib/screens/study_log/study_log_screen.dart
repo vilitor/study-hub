@@ -37,7 +37,22 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<StudyLogProvider>();
+    final timerProvider = context.watch<StudyTimerProvider>();
     final schema = provider.cachedSchema;
+
+    // Auto-fill from last timer session if available
+    if (schema != null && timerProvider.lastSessionMinutes > 0) {
+      // Use the same logic as _onTimerStopped but without the snackbar to avoid loop
+      final minutes = timerProvider.lastSessionMinutes;
+      
+      // Delay the state update to avoid "setState during build"
+      Future.microtask(() {
+        if (mounted) {
+          _onTimerStopped(minutes, schema);
+          timerProvider.clearLastSession();
+        }
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -52,7 +67,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
       body: schema == null
           ? _buildNoSchemaState(provider.isLoading)
           : SingleChildScrollView(
-              padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 110),
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 140),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -115,12 +130,12 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.table_chart_rounded, size: 64, color: AppColors.textSecondary),
+            Icon(Icons.table_chart_rounded, size: 64, color: Theme.of(context).textTheme.bodySmall?.color),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'A Estrutura do Tabela ainda não foi sincronizada.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 16, color: Theme.of(context).textTheme.bodyLarge?.color),
             ),
             const SizedBox(height: 24),
             CustomButton(
@@ -145,22 +160,44 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     );
   }
 
-  /// Called when the timer is stopped — auto-fills the first number field.
+  /// Called when the timer is stopped — auto-fills the correct number field.
   void _onTimerStopped(int minutes, dynamic schema) {
     if (schema == null || minutes <= 0) return;
 
-    // Find the first 'number' property in the schema to populate
-    final numberProp = schema.properties.entries
-        .where((e) => e.value.type == 'number')
-        .firstOrNull;
+    // 1. Try to find a field named "tempo" (case insensitive)
+    var targetProp = schema.properties.entries.firstWhere(
+      (e) => e.value.type == 'number' && e.value.name.toLowerCase().contains('tempo'),
+      orElse: () => MapEntry('', null),
+    ).value;
 
-    if (numberProp != null) {
+    // 2. If not found, try "time"
+    if (targetProp == null) {
+      targetProp = schema.properties.entries.firstWhere(
+        (e) => e.value.type == 'number' && e.value.name.toLowerCase().contains('time'),
+        orElse: () => MapEntry('', null),
+      ).value;
+    }
+
+    // 3. Fallback to the first number field
+    if (targetProp == null) {
+      targetProp = schema.properties.entries.firstWhere(
+        (e) => e.value.type == 'number',
+        orElse: () => MapEntry('', null),
+      ).value;
+    }
+
+    if (targetProp != null) {
       setState(() {
-        _dynamicFormValues[numberProp.value.name] = minutes;
+        _dynamicFormValues[targetProp.name] = minutes;
       });
       SnackbarHelper.showSuccess(
         context,
-        'Tempo preenchido: ${minutes}min ⏱️',
+        'Tempo de estudo preenchido: ${minutes}min ⏱️',
+      );
+    } else {
+      SnackbarHelper.showWarning(
+        context,
+        'Não encontramos um campo numérico para preencher o tempo.',
       );
     }
   }

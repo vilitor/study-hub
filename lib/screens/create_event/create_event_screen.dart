@@ -55,7 +55,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             : null,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 110),
+        padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 140),
         child: Form(
           key: _formKey,
           child: Column(
@@ -216,8 +216,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.cardGrey,
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,10 +248,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Icon(Icons.arrow_forward_rounded,
-              color: AppColors.textHint, size: 20),
+              color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textHint, size: 20),
         ),
         Expanded(
           child: GestureDetector(
@@ -255,8 +259,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.cardGrey,
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +361,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppColors.primaryGreen
-                      : AppColors.cardGrey,
+                      : Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -362,7 +370,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color:
-                        isSelected ? Colors.white : AppColors.textSecondary,
+                        isSelected ? Colors.white : Theme.of(context).textTheme.bodySmall?.color,
                   ),
                 ),
               ),

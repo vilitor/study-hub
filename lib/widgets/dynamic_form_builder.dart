@@ -102,7 +102,7 @@ class DynamicFormBuilder extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: AppColors.cardGrey,
+              color: Theme.of(context).inputDecorationTheme.fillColor ?? AppColors.cardGrey,
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButtonHideUnderline(
@@ -171,7 +171,7 @@ class DynamicFormBuilder extends StatelessWidget {
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.purple : AppColors.purple.withValues(alpha: 0.1),
+                    color: isSelected ? AppColors.purple : Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(

@@ -143,9 +143,9 @@ class _CreateGoalSheetState extends State<CreateGoalSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(
         24,
@@ -210,7 +210,6 @@ class _CreateGoalSheetState extends State<CreateGoalSheet> {
             'Linguagens / Matérias (Opcional)',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
                 ),
           ),
           const SizedBox(height: 8),
@@ -241,7 +240,7 @@ class _CreateGoalSheetState extends State<CreateGoalSheet> {
                   decoration: BoxDecoration(
                     color: isSelected
                         ? AppColors.purple
-                        : AppColors.purple.withValues(alpha: 0.1),
+                        : Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -316,7 +315,7 @@ class _TypeButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryGreen : AppColors.cardGrey,
+          color: isSelected ? AppColors.primaryGreen : Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
           borderRadius: BorderRadius.circular(16),
         ),
         alignment: Alignment.center,
@@ -325,7 +324,7 @@ class _TypeButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : AppColors.textSecondary,
+            color: isSelected ? Colors.white : Theme.of(context).textTheme.bodySmall?.color,
           ),
         ),
       ),

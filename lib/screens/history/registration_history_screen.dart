@@ -206,9 +206,9 @@ class _HistoryLogCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardGrey),
+          border: Border.all(color: Theme.of(context).dividerTheme.color ?? AppColors.cardGrey),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -354,7 +354,7 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.purple : AppColors.purple.withValues(alpha: 0.08),
+          color: isSelected ? AppColors.purple : Theme.of(context).colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
