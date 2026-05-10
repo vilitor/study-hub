@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:study_hub/config/app_theme.dart';
 import 'package:study_hub/providers/study_timer_provider.dart';
+import 'package:study_hub/services/app_haptics.dart';
 
 /// A floating bar that appears above the bottom navigation when the timer is active.
 /// Animates smoothly with a slide-up transition.
@@ -26,13 +27,16 @@ class FloatingTimerBar extends StatelessWidget {
               child: SafeArea(
                 bottom: false,
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 96),
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 84),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.purple.withValues(alpha: 0.75),
                           borderRadius: BorderRadius.circular(20),
@@ -54,35 +58,51 @@ class FloatingTimerBar extends StatelessWidget {
                             _PulsingDot(isRunning: timer.isRunning),
                             const SizedBox(width: 10),
 
-                    // Elapsed time
-                    Text(
-                      timer.formattedTime,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
+                            // Elapsed time
+                            Text(
+                              timer.formattedTime,
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
 
-                    const Spacer(),
+                            const Spacer(),
 
-                    // Pause / Resume button
-                    _BarIconButton(
-                      icon: timer.isPaused
-                          ? Icons.play_arrow_rounded
-                          : Icons.pause_rounded,
-                      onTap: () =>
-                          timer.isPaused ? timer.resume() : timer.pause(),
-                    ),
-                    const SizedBox(width: 8),
+                            // Send to Notion button
+                            _BarIconButton(
+                              icon: Icons.input_rounded,
+                              color: Colors.white,
+                              onTap: () {
+                                AppHaptics.selection();
+                                timer.recordSession();
+                              },
+                            ),
+                            const SizedBox(width: 8),
 
-                    // Stop button
-                    _BarIconButton(
-                      icon: Icons.stop_rounded,
-                      color: AppColors.coral,
-                      onTap: () => timer.stop(),
-                    ),
+                            // Pause / Resume button
+                            _BarIconButton(
+                              icon: timer.isPaused
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.pause_rounded,
+                              onTap: () {
+                                AppHaptics.selection();
+                                timer.isPaused ? timer.resume() : timer.pause();
+                              },
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Stop button
+                            _BarIconButton(
+                              icon: Icons.stop_rounded,
+                              color: AppColors.coral,
+                              onTap: () {
+                                AppHaptics.warning();
+                                timer.stop();
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -104,11 +124,7 @@ class _BarIconButton extends StatelessWidget {
   final Color? color;
   final VoidCallback onTap;
 
-  const _BarIconButton({
-    required this.icon,
-    this.color,
-    required this.onTap,
-  });
+  const _BarIconButton({required this.icon, this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -148,9 +164,10 @@ class _PulsingDotState extends State<_PulsingDot>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _animation = Tween<double>(begin: 0.4, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: 0.4,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     if (widget.isRunning) _controller.repeat(reverse: true);
   }

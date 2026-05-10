@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:study_hub/config/app_theme.dart';
-import 'package:study_hub/config/app_constants.dart';
 import 'package:study_hub/models/study_goal.dart';
 import 'package:study_hub/providers/goal_provider.dart';
+import 'package:study_hub/providers/settings_provider.dart';
 import 'package:study_hub/providers/study_log_provider.dart';
+import 'package:study_hub/repositories/subject_repository.dart';
+import 'package:study_hub/services/app_haptics.dart';
+import 'package:study_hub/services/storage_service.dart';
+import 'package:study_hub/utils/snackbar_helper.dart';
+import 'package:study_hub/widgets/app_modal.dart';
+import 'package:study_hub/widgets/app_multi_select_field.dart';
+import 'package:study_hub/widgets/app_surface.dart';
 import 'package:study_hub/widgets/custom_button.dart';
 import 'package:study_hub/widgets/custom_text_field.dart';
-import 'package:study_hub/utils/snackbar_helper.dart';
 
-/// Bottom sheet for creating or editing a study goal.
 class CreateGoalSheet extends StatefulWidget {
   final StudyGoal? existingGoal;
 
   const CreateGoalSheet({super.key, this.existingGoal});
 
   static Future<void> show(BuildContext context, {StudyGoal? goal}) {
-    return showModalBottomSheet(
+    return AppModal.showSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => CreateGoalSheet(existingGoal: goal),
     );
   }
@@ -29,12 +32,13 @@ class CreateGoalSheet extends StatefulWidget {
 }
 
 class _CreateGoalSheetState extends State<CreateGoalSheet> {
+  static const SubjectRepository _subjectRepository = SubjectRepository();
   late GoalType _type;
   late int _targetMinutes;
   List<String> _selectedLanguages = [];
   List<String> _availableLanguages = [];
-
   final _minutesController = TextEditingController();
+  bool _showGoalTutorial = false;
 
   @override
   void initState() {
@@ -48,8 +52,9 @@ class _CreateGoalSheetState extends State<CreateGoalSheet> {
       _minutesController.text = _targetMinutes.toString();
     } else {
       _type = GoalType.weekly;
-      _targetMinutes = 120; // Default 2 hours
+      _targetMinutes = 120;
       _minutesController.text = '120';
+      _loadGoalTutorialState();
     }
   }
 
@@ -59,46 +64,34 @@ class _CreateGoalSheetState extends State<CreateGoalSheet> {
     super.dispose();
   }
 
-  /// Extracts language options from the Notion schema if available,
-  /// otherwise falls back to default hardcoded subjects.
   void _loadAvailableLanguages() {
-    final logProvider = context.read<StudyLogProvider>();
-    final schema = logProvider.cachedSchema;
-
-    if (schema != null) {
-      // Find the 'Linguagem' field (or similar select/multi_select)
-      for (final entry in schema.properties.entries) {
-        if (entry.value.name.toLowerCase().contains('linguagem') ||
-            entry.value.name.toLowerCase().contains('materia') ||
-            entry.value.name.toLowerCase().contains('subject')) {
-          if (entry.value.options.isNotEmpty) {
-            _availableLanguages = entry.value.options;
-            return;
-          }
-        }
-      }
-      
-      // Fallback: any select/multi_select
-      for (final entry in schema.properties.entries) {
-        if (entry.value.type == 'select' || entry.value.type == 'multi_select') {
-          if (entry.value.options.isNotEmpty) {
-            _availableLanguages = entry.value.options;
-            return;
-          }
-        }
-      }
-    }
-
-    // Ultimate fallback
-    _availableLanguages = AppConstants.defaultSubjects;
+    final schema = context.read<StudyLogProvider>().cachedSchema;
+    final settings = context.read<SettingsProvider>().settings;
+    _availableLanguages = _subjectRepository.getSubjects(
+      settings: settings,
+      schema: schema,
+    );
   }
 
-  void _save() async {
+  Future<void> _loadGoalTutorialState() async {
+    final seen = await StorageService().hasSeenGoalTutorial();
+    if (!mounted || seen) return;
+    setState(() => _showGoalTutorial = true);
+  }
+
+  Future<void> _completeGoalTutorial() async {
+    await StorageService().setGoalTutorialSeen();
+    if (!mounted) return;
+    AppHaptics.selection();
+    setState(() => _showGoalTutorial = false);
+  }
+
+  Future<void> _save() async {
     final provider = context.read<GoalProvider>();
     final minutes = int.tryParse(_minutesController.text) ?? 0;
 
     if (minutes <= 0) {
-      SnackbarHelper.showWarning(context, 'Insira um tempo válido (em minutos).');
+      SnackbarHelper.showWarning(context, 'Insira um tempo válido em minutos.');
       return;
     }
 
@@ -115,178 +108,187 @@ class _CreateGoalSheetState extends State<CreateGoalSheet> {
 
     if (widget.existingGoal != null) {
       await provider.updateGoal(goal);
+      await AppHaptics.success();
       if (mounted) Navigator.pop(context);
-    } else {
-      final success = await provider.addGoal(goal);
-      if (success) {
-        if (mounted) Navigator.pop(context);
-      } else {
-        if (mounted) {
-          SnackbarHelper.showError(
-              context, 'Já existe uma meta ativa para este período.');
-        }
-      }
+      return;
+    }
+
+    final success = await provider.addGoal(goal);
+    if (success) {
+      await AppHaptics.success();
+      if (mounted) Navigator.pop(context);
+    } else if (mounted) {
+      SnackbarHelper.showError(
+        context,
+        'Já existe uma meta ativa para este período.',
+      );
     }
   }
 
-  void _delete() async {
+  Future<void> _delete() async {
     if (widget.existingGoal == null) return;
-
-    final provider = context.read<GoalProvider>();
-    await provider.deleteGoal(widget.existingGoal!.id);
-    if (mounted) {
-      Navigator.pop(context);
-      SnackbarHelper.showSuccess(context, 'Meta excluída.');
-    }
+    AppHaptics.warning();
+    await context.read<GoalProvider>().deleteGoal(widget.existingGoal!.id);
+    if (!mounted) return;
+    AppHaptics.success();
+    Navigator.pop(context);
+    SnackbarHelper.showSuccess(context, 'Meta excluída.');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+    final spacing = context.spacing;
+    final colors = context.colors;
+    return AppSurface(
+      color: colors.modalSurface,
+      shadow: context.elevations.high,
+      radius: spacing.cardRadius,
       padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        MediaQuery.of(context).viewInsets.bottom + 24,
+        spacing.xl,
+        spacing.xl,
+        spacing.xl,
+        MediaQuery.of(context).viewInsets.bottom + spacing.xl,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                widget.existingGoal != null ? 'Editar Meta' : 'Nova Meta',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              IconButton(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppSectionHeader(
+              title: widget.existingGoal != null ? 'Editar meta' : 'Nova meta',
+              subtitle:
+                  'Defina uma meta semanal ou mensal com matérias opcionais.',
+              trailing: IconButton(
                 icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.pop(context),
               ),
+            ),
+            SizedBox(height: spacing.xl),
+            if (_showGoalTutorial) ...[
+              _GoalTutorialCard(onComplete: _completeGoalTutorial),
+              SizedBox(height: spacing.xl),
             ],
-          ),
-          const SizedBox(height: 24),
-
-          // Type Selector
-          Row(
-            children: [
-              Expanded(
-                child: _TypeButton(
-                  label: 'Semanal',
-                  isSelected: _type == GoalType.weekly,
-                  onTap: () => setState(() => _type = GoalType.weekly),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _TypeButton(
-                  label: 'Mensal',
-                  isSelected: _type == GoalType.monthly,
-                  onTap: () => setState(() => _type = GoalType.monthly),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Target Minutes
-          CustomTextField(
-            label: 'Tempo Alvo (em minutos)',
-            hint: 'Ex: 120 para 2 horas',
-            prefixIcon: Icons.timer_rounded,
-            controller: _minutesController,
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 24),
-
-          // Languages Selector
-          Text(
-            'Linguagens / Matérias (Opcional)',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Se vazio, contabiliza todo tempo de estudo.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _availableLanguages.map((lang) {
-              final isSelected = _selectedLanguages.contains(lang);
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedLanguages.remove(lang);
-                    } else {
-                      _selectedLanguages.add(lang);
-                    }
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.purple
-                        : Theme.of(context).colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isSelected) ...[
-                        const Icon(Icons.check_rounded,
-                            size: 14, color: Colors.white),
-                        const SizedBox(width: 4),
-                      ],
-                      Text(
-                        lang,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.white : AppColors.purple,
-                        ),
-                      ),
-                    ],
+            Row(
+              children: [
+                Expanded(
+                  child: _TypeButton(
+                    label: 'Semanal',
+                    isSelected: _type == GoalType.weekly,
+                    onTap: () {
+                      AppHaptics.selection();
+                      setState(() => _type = GoalType.weekly);
+                    },
                   ),
                 ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 32),
-
-          // Actions
-          Row(
-            children: [
-              if (widget.existingGoal != null) ...[
-                IconButton(
-                  onPressed: _delete,
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      color: AppColors.error),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.error.withValues(alpha: 0.1),
-                    padding: const EdgeInsets.all(16),
+                SizedBox(width: spacing.md),
+                Expanded(
+                  child: _TypeButton(
+                    label: 'Mensal',
+                    isSelected: _type == GoalType.monthly,
+                    onTap: () {
+                      AppHaptics.selection();
+                      setState(() => _type = GoalType.monthly);
+                    },
                   ),
                 ),
-                const SizedBox(width: 16),
               ],
-              Expanded(
-                child: CustomButton(
-                  label: 'Salvar Meta',
-                  onPressed: _save,
+            ),
+            SizedBox(height: spacing.xl),
+            CustomTextField(
+              label: 'Tempo alvo (em minutos)',
+              hint: 'Ex: 120 para 2 horas',
+              prefixIcon: Icons.timer_rounded,
+              controller: _minutesController,
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: spacing.xl),
+            AppMultiSelectField(
+              title: 'Linguagens / Matérias',
+              helperText: 'Se vazio, contabiliza todo o tempo de estudo.',
+              options: _availableLanguages,
+              selectedValues: _selectedLanguages,
+              enableSearch: _availableLanguages.length >= 8,
+              onChanged: (values) =>
+                  setState(() => _selectedLanguages = values),
+            ),
+            SizedBox(height: spacing.xxl),
+            Row(
+              children: [
+                if (widget.existingGoal != null) ...[
+                  IconButton(
+                    onPressed: _delete,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    style: IconButton.styleFrom(
+                      backgroundColor: colors.error.withValues(alpha: 0.12),
+                      foregroundColor: colors.error,
+                      minimumSize: const Size(52, 52),
+                    ),
+                  ),
+                  SizedBox(width: spacing.md),
+                ],
+                Expanded(
+                  child: CustomButton(label: 'Salvar meta', onPressed: _save),
                 ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GoalTutorialCard extends StatelessWidget {
+  final Future<void> Function() onComplete;
+
+  const _GoalTutorialCard({required this.onComplete});
+
+  @override
+  Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    final colors = context.colors;
+    return AppSurface.subtle(
+      padding: EdgeInsets.all(spacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: colors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.tips_and_updates_rounded,
+                  color: colors.accent,
+                ),
+              ),
+              SizedBox(width: spacing.md),
+              Expanded(
+                child: Text(
+                  'Como as materias da meta funcionam',
+                  style: context.theme.textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: spacing.md),
+          Text(
+            'As materias usadas nas metas vêm das categorias da tela de Eventos. Para editar essa lista, abra Criar evento e use o icone de engrenagem no campo Matérias.',
+            style: context.theme.textTheme.bodySmall,
+          ),
+          SizedBox(height: spacing.md),
+          Row(
+            children: [
+              TextButton(onPressed: onComplete, child: const Text('Pular')),
+              const Spacer(),
+              FilledButton.icon(
+                onPressed: onComplete,
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Entendi'),
               ),
             ],
           ),
@@ -309,22 +311,30 @@ class _TypeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryGreen : Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : Theme.of(context).textTheme.bodySmall?.color,
+    final colors = context.colors;
+    final spacing = context.spacing;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(spacing.fieldRadius),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(vertical: spacing.md),
+          decoration: BoxDecoration(
+            color: isSelected ? colors.accent : colors.surface2,
+            borderRadius: BorderRadius.circular(spacing.fieldRadius),
+            border: Border.all(
+              color: isSelected ? colors.accent : colors.borderSubtle,
+            ),
+          ),
+          child: Text(
+            label,
+            style: context.theme.textTheme.labelLarge?.copyWith(
+              color: isSelected ? colors.textOnAccent : colors.textPrimary,
+            ),
           ),
         ),
       ),

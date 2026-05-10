@@ -1,16 +1,18 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:study_hub/models/cloud_sync.dart';
 import 'package:study_hub/models/study_goal.dart';
 import 'package:study_hub/models/study_log.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:study_hub/services/cloud_sync_service.dart';
+import 'package:study_hub/services/storage_service.dart';
 
 /// Provider that manages study goals with local persistence.
 /// Calculates progress by matching StudyLog entries against goal criteria.
 class GoalProvider extends ChangeNotifier {
   final List<StudyGoal> _goals = [];
+  final StorageService _storage = StorageService();
+  final CloudSyncService _cloudSync = CloudSyncService.instance;
   bool _isLoading = false;
-
-  static const String _storageKey = 'persisted_study_goals';
 
   // ── Getters ──
 
@@ -55,8 +57,10 @@ class GoalProvider extends ChangeNotifier {
       return _logMatchesLanguages(log, goal.languages);
     });
 
-    final totalMinutes =
-        matchingLogs.fold<int>(0, (sum, log) => sum + log.studyTimeMinutes);
+    final totalMinutes = matchingLogs.fold<int>(
+      0,
+      (sum, log) => sum + log.studyTimeMinutes,
+    );
 
     final progress = totalMinutes / goal.targetMinutes;
     return progress.clamp(0.0, 1.0);
@@ -97,16 +101,24 @@ class GoalProvider extends ChangeNotifier {
   /// Adds a new goal. Returns false if a duplicate exists for the same period.
   Future<bool> addGoal(StudyGoal goal) async {
     // Check for duplicates
-    final hasDuplicate = _goals.any((g) =>
-        g.type == goal.type &&
-        g.periodStart.year == goal.periodStart.year &&
-        g.periodStart.month == goal.periodStart.month &&
-        g.periodStart.day == goal.periodStart.day);
+    final hasDuplicate = _goals.any(
+      (g) =>
+          g.type == goal.type &&
+          g.periodStart.year == goal.periodStart.year &&
+          g.periodStart.month == goal.periodStart.month &&
+          g.periodStart.day == goal.periodStart.day,
+    );
 
     if (hasDuplicate) return false;
 
-    _goals.add(goal);
+    final goalToSave = goal.copyWith(
+      updatedAt: DateTime.now(),
+      syncStatus: CloudSyncStatus.pendingSync,
+    );
+    _goals.add(goalToSave);
     await _saveGoals();
+    await _cloudSync.enqueueGoal(goalToSave);
+    unawaited(_cloudSync.flushQueue());
     notifyListeners();
     return true;
   }
@@ -115,8 +127,14 @@ class GoalProvider extends ChangeNotifier {
   Future<void> updateGoal(StudyGoal updatedGoal) async {
     final index = _goals.indexWhere((g) => g.id == updatedGoal.id);
     if (index != -1) {
-      _goals[index] = updatedGoal;
+      final goalToSave = updatedGoal.copyWith(
+        updatedAt: DateTime.now(),
+        syncStatus: CloudSyncStatus.pendingSync,
+      );
+      _goals[index] = goalToSave;
       await _saveGoals();
+      await _cloudSync.enqueueGoal(goalToSave);
+      unawaited(_cloudSync.flushQueue());
       notifyListeners();
     }
   }
@@ -125,6 +143,11 @@ class GoalProvider extends ChangeNotifier {
   Future<void> deleteGoal(String goalId) async {
     _goals.removeWhere((g) => g.id == goalId);
     await _saveGoals();
+    await _cloudSync.enqueueDelete(
+      collection: CloudCollections.goals,
+      documentId: goalId,
+    );
+    unawaited(_cloudSync.flushQueue());
     notifyListeners();
   }
 
@@ -135,15 +158,8 @@ class GoalProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_storageKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        _goals.clear();
-        _goals.addAll(
-          decoded.map((e) => StudyGoal.fromMap(e as Map<String, dynamic>)),
-        );
-      }
+      _goals.clear();
+      _goals.addAll(await _storage.getStudyGoals());
     } catch (e) {
       debugPrint('[GoalProvider] Error loading goals: $e');
     } finally {
@@ -153,8 +169,6 @@ class GoalProvider extends ChangeNotifier {
   }
 
   Future<void> _saveGoals() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = jsonEncode(_goals.map((g) => g.toMap()).toList());
-    await prefs.setString(_storageKey, jsonStr);
+    await _storage.saveStudyGoals(_goals);
   }
 }

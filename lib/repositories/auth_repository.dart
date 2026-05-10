@@ -6,14 +6,17 @@ import 'package:http/http.dart' as http;
 class AuthRepository {
   final AuthService _authService = AuthService();
 
-  /// Initiates the Google Sign-in flow
-  Future<GoogleSignInAccount?> login() async {
-    return await _authService.signIn();
+  Future<GoogleFirebaseSignInResult> login() async {
+    return await _authService.signInWithGoogleAndFirebase();
   }
 
   /// Disconnects the current user from Google
   Future<void> logout() async {
     return await _authService.signOut();
+  }
+
+  Future<void> disconnect() async {
+    return await _authService.disconnect();
   }
 
   /// Attempts to sign in silently if a previous session exists

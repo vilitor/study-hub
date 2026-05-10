@@ -1,123 +1,84 @@
-import 'package:flutter/material.dart';
 import 'dart:ui';
 
-/// Item data for the FloatingNavBar
+import 'package:flutter/material.dart';
+import 'package:study_hub/config/app_theme.dart';
+
 class NavItem {
   final IconData icon;
   final String label;
 
-  NavItem({required this.icon, required this.label});
+  const NavItem({required this.icon, required this.label});
 }
 
-/// A premium, floating capsule-style Bottom Navigation Bar.
-/// Inspired by high-end product designs (pill-shaped with sliding indicator).
-class FloatingNavBar extends StatefulWidget {
+class FloatingNavBar extends StatelessWidget {
   final int currentIndex;
+  final bool isVisible;
   final List<NavItem> items;
-  final Function(int) onTap;
+  final ValueChanged<int> onTap;
 
   const FloatingNavBar({
     super.key,
     required this.currentIndex,
+    required this.isVisible,
     required this.items,
     required this.onTap,
   });
 
   @override
-  State<FloatingNavBar> createState() => _FloatingNavBarState();
-}
-
-class _FloatingNavBarState extends State<FloatingNavBar> {
-  static const double _navBarHeight = 64.0;
-  static const double _horizontalPadding = 8.0;
-
-  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    // Frosted glass colors: dark "smoke" tint for both modes
-    final navBgColor = isDark 
-        ? const Color(0xFF1E1E2D).withValues(alpha: 0.75)
-        : const Color(0xFF121212).withValues(alpha: 0.7); 
-    
-    final indicatorColor = Theme.of(context).colorScheme.primary;
-    final unselectedColor = Colors.white.withValues(alpha: 0.5);
+    final spacing = context.spacing;
+    final colors = context.colors;
 
-    return SafeArea(
-      bottom: true,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        height: _navBarHeight,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: navBgColor,
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08), 
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+    final navBackground = Color.alphaBlend(
+      colors.navBackground.withValues(alpha: 0.76),
+      colors.scaffoldBase.withValues(alpha: 0.18),
+    );
+
+    return AnimatedSlide(
+      duration: isVisible
+          ? const Duration(milliseconds: 220)
+          : const Duration(milliseconds: 200),
+      curve: isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
+      offset: isVisible ? Offset.zero : const Offset(0, 1.4),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        curve: isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
+        opacity: isVisible ? 1 : 0.98,
+        child: IgnorePointer(
+          ignoring: !isVisible,
+          child: SafeArea(
+            minimum: EdgeInsets.fromLTRB(spacing.md, 0, spacing.md, spacing.sm),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(spacing.pillRadius),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  height: 68,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.sm,
+                    vertical: spacing.xs,
                   ),
-                ],
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final double totalWidth = constraints.maxWidth;
-                  final double itemWidth = (totalWidth - (_horizontalPadding * 2)) / widget.items.length;
-
-                  return Stack(
-                    children: [
-                      // --- Sliding Pill Background Indicator ---
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 350),
-                        curve: Curves.elasticOut,
-                        left: _horizontalPadding + (widget.currentIndex * itemWidth),
-                        top: 8,
-                        bottom: 8,
-                        width: itemWidth,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: indicatorColor,
-                            borderRadius: BorderRadius.circular(24),
-                          ),
+                  decoration: BoxDecoration(
+                    color: navBackground,
+                    borderRadius: BorderRadius.circular(spacing.pillRadius),
+                    border: Border.all(
+                      color: colors.borderSubtle.withValues(alpha: 0.72),
+                    ),
+                    boxShadow: context.elevations.medium,
+                  ),
+                  child: Row(
+                    children: List.generate(items.length, (index) {
+                      final selected = index == currentIndex;
+                      return Expanded(
+                        child: _NavBarButton(
+                          item: items[index],
+                          selected: selected,
+                          onTap: () => onTap(index),
                         ),
-                      ),
-
-                      // --- Icons and Labels ---
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: _horizontalPadding),
-                        child: Row(
-                          children: List.generate(widget.items.length, (index) {
-                            final item = widget.items[index];
-                            final isSelected = widget.currentIndex == index;
-
-                            return Expanded(
-                              child: GestureDetector(
-                                onTap: () => widget.onTap(index),
-                                behavior: HitTestBehavior.opaque,
-                                child: _NavBarItemWidget(
-                                  icon: item.icon,
-                                  label: item.label,
-                                  isSelected: isSelected,
-                                  selectedColor: Colors.white,
-                                  unselectedColor: unselectedColor,
-                                ),
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                      );
+                    }),
+                  ),
+                ),
               ),
             ),
           ),
@@ -127,53 +88,69 @@ class _FloatingNavBarState extends State<FloatingNavBar> {
   }
 }
 
-class _NavBarItemWidget extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final Color selectedColor;
-  final Color unselectedColor;
+class _NavBarButton extends StatelessWidget {
+  final NavItem item;
+  final bool selected;
+  final VoidCallback onTap;
 
-  const _NavBarItemWidget({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.selectedColor,
-    required this.unselectedColor,
+  const _NavBarButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedDefaultTextStyle(
-      duration: const Duration(milliseconds: 300),
-      style: TextStyle(
-        color: isSelected ? selectedColor : unselectedColor,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-      child: IconTheme(
-        data: IconThemeData(
-          color: isSelected ? selectedColor : unselectedColor,
-          size: 22,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              width: isSelected ? 8 : 0,
-            ),
-            if (isSelected)
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
+    final colors = context.colors;
+    final spacing = context.spacing;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item.label,
+      child: Center(
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(spacing.pillRadius),
+              onTap: onTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? colors.navActive.withValues(alpha: 0.12)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(spacing.pillRadius),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: colors.accent.withValues(alpha: 0.18),
+                            blurRadius: 16,
+                            spreadRadius: 0,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 1, end: selected ? 1.15 : 1),
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  builder: (context, scale, child) {
+                    return Transform.scale(scale: scale, child: child);
+                  },
+                  child: Icon(
+                    item.icon,
+                    size: 24,
+                    color: selected ? colors.accent : colors.navInactive,
+                  ),
                 ),
               ),
-          ],
+            ),
+          ),
         ),
       ),
     );

@@ -1,64 +1,98 @@
-# GitHub Deployment Guide 🚀
+# StudyHub GitHub Migration Guide
 
-Follow these instructions to publish **StudyHub** to your professional GitHub portfolio using industry best practices.
+Use `study_hub` as the repository root. Do not initialize or push from the parent
+`app` directory, because it contains unrelated local files.
 
-## 1. Local Cleanup
-Before initializing the repository, ensure no local or temporary files are present:
+## Security Rules
+
+Never commit release signing material, passwords, local SDK paths, or private
+environment files.
+
+Ignored local-only files:
+
+- `.env`
+- `.env.*`
+- `android/key.properties`
+- `android/app/release-keystore.jks`
+- `android/local.properties`
+- Build and IDE output such as `build/`, `.dart_tool/`, `.gradle/`, `.idea/`,
+  `.vscode/`, and `*.log`
+
+Tracked portable Firebase config:
+
+- `android/app/google-services.json`
+
+`google-services.json` is Android Firebase client configuration and is tracked
+so another development PC can clone and build the app without recreating that
+file. Do not put signing passwords or private API tokens in this file.
+
+## Manual Files Required On Each PC
+
+After cloning on a new trusted PC, manually copy these files from secure backup:
+
+- `android/app/release-keystore.jks`
+- `android/key.properties`
+
+Then create the local environment file from the example:
+
 ```bash
-flutter clean
+copy .env.example .env
 ```
 
-## 2. Initialize Git
-If you haven't initialized Git yet, run:
+Fill `.env` with local/private values. Keep `.env` untracked.
+
+## Setup On A New PC
+
+```bash
+git clone https://github.com/vilitor/study-hub.git
+cd study-hub
+copy .env.example .env
+flutter pub get
+flutter test
+flutter build apk --release
+```
+
+The release build requires the manually copied keystore and
+`android/key.properties`. If either file is missing, Gradle should fail before
+producing an unsigned or incorrectly signed release artifact.
+
+## GitHub Commands
+
+Fresh local setup:
+
 ```bash
 git init
-git branch -M main
-```
-
-## 3. First Commit (Conventional Commits)
-Add all files (the `.gitignore` will automatically exclude sensitive ones) and create the initial commit:
-```bash
 git add .
-git commit -m "feat: initial release of StudyHub Study Management App"
-```
-*Note: We use the `feat:` prefix following the [Conventional Commits](https://www.conventionalcommits.org/) specification.*
-
-## 4. Create GitHub Repository
-1. Go to [GitHub](https://github.com/new).
-2. Name the repository `study-hub` or similar.
-3. Keep it **Public** for portfolio visibility.
-4. **Do not** initialize with README or license (you already have them).
-
-## 5. Push to GitHub
-Copy the remote URL from GitHub and run:
-```bash
-git remote add origin https://github.com/YOUR_USERNAME/study-hub.git
+git commit -m "Initial production setup"
+git branch -M main
+git remote add origin https://github.com/vilitor/study-hub.git
 git push -u origin main
 ```
 
-## 6. Branching Strategy
-For professional projects, avoid pushing directly to `main` for new features. Use a `develop` branch:
+Existing checkout where `origin` already exists:
+
 ```bash
-git checkout -b develop
-# Make changes...
 git add .
-git commit -m "docs: update setup instructions"
-git push origin develop
+git commit -m "Initial production setup"
+git branch -M main
+git remote set-url origin https://github.com/vilitor/study-hub.git
+git push -u origin main
 ```
 
-## 7. Tagging a Release
-To mark your first stable version (v1.0.0):
+## Pre-Push Validation
+
 ```bash
-git tag -a v1.0.0 -m "First stable release"
-git push origin v1.0.0
+git check-ignore -v android/key.properties android/app/release-keystore.jks android/local.properties .env
+git check-ignore -v android/app/google-services.json
+git status --short
+git diff --cached --name-only
 ```
 
----
+The first command must show ignore rules for the sensitive local files. The
+second command should print nothing, confirming Firebase config is trackable.
+Before pushing, confirm these files are not staged:
 
-### ✅ Portfolio Checklist
-- [ ] README.md is present and looks good on GitHub.
-- [ ] No `.env` files are in the repository.
-- [ ] Project builds successfully on a clean machine.
-- [ ] Security/Privacy sections are clearly visible.
-
-**Happy Deployment!**
+- `.env`
+- `android/key.properties`
+- `android/app/release-keystore.jks`
+- `android/local.properties`

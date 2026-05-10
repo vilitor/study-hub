@@ -20,7 +20,8 @@ class WeeklyCalendar extends StatefulWidget {
 
 class _WeeklyCalendarState extends State<WeeklyCalendar> {
   late PageController _pageController;
-  final int _initialPage = 5000; // Índice arbitrário alto para scroll "infinito"
+  final int _initialPage =
+      5000; // Índice arbitrário alto para scroll "infinito"
   late DateTime _baseDate;
 
   @override
@@ -41,7 +42,8 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
 
   void _jumpToDate(DateTime date) {
     final int targetPage = _calculatePageForDate(date);
-    if (_pageController.hasClients && _pageController.page?.round() != targetPage) {
+    if (_pageController.hasClients &&
+        _pageController.page?.round() != targetPage) {
       _pageController.animateToPage(
         targetPage,
         duration: const Duration(milliseconds: 300),
@@ -88,22 +90,33 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
         itemBuilder: (context, index) {
           // Calcula os dias dessa página (semana)
           final weekOffset = index - _initialPage;
-          final weekStartDate = _getStartOfWeek(_baseDate).add(Duration(days: weekOffset * 7));
-          final weekDays = List.generate(7, (i) => weekStartDate.add(Duration(days: i)));
+          final weekStartDate = _getStartOfWeek(
+            _baseDate,
+          ).add(Duration(days: weekOffset * 7));
+          final weekDays = List.generate(
+            7,
+            (i) => weekStartDate.add(Duration(days: i)),
+          );
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: weekDays.map((day) {
-                final isSelected = DateHelpers.isSameDay(day, widget.selectedDate);
+                final isSelected = DateHelpers.isSameDay(
+                  day,
+                  widget.selectedDate,
+                );
                 final isToday = DateHelpers.isToday(day);
 
                 return GestureDetector(
                   onTap: () => widget.onDateSelected(day),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected ? AppColors.coral : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
@@ -119,8 +132,8 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
                             color: isSelected
                                 ? Colors.white
                                 : isToday
-                                    ? AppColors.coral
-                                    : Theme.of(context).textTheme.bodySmall?.color,
+                                ? AppColors.coral
+                                : Theme.of(context).textTheme.bodySmall?.color,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -134,8 +147,8 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
                             color: isSelected
                                 ? Colors.white
                                 : isToday
-                                    ? AppColors.coral
-                                    : Theme.of(context).textTheme.bodyLarge?.color,
+                                ? AppColors.coral
+                                : Theme.of(context).textTheme.bodyLarge?.color,
                           ),
                         ),
                       ],

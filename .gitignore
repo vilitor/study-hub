@@ -1,7 +1,7 @@
 # Environment variables
 .env
-.env.secret
-.env.test
+.env.*
+!.env.example
 
 # IDE - VS Code
 .vscode/*
@@ -33,10 +33,10 @@ Thumbs.db
 
 # Android
 android/key.properties
+android/local.properties
+android/app/release-keystore.jks
 android/app/*.jks
 android/app/*.keystore
-android/app/*.json
-**/google-services.json
 
 # iOS
 ios/Flutter/Generated.xcconfig
@@ -46,6 +46,14 @@ ios/Runner/GeneratedPluginRegistrant.h
 ios/Runner/GeneratedPluginRegistrant.m
 **/Pods/
 **/podfile.lock
+
+# Windows
+build/
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
 
 # Log files
 *.log

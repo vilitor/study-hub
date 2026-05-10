@@ -5,6 +5,7 @@ import 'package:study_hub/models/notion_schema.dart';
 import 'package:study_hub/repositories/study_repository.dart';
 import 'package:study_hub/services/storage_service.dart';
 import 'package:study_hub/services/notion_service.dart';
+import 'package:study_hub/services/local_study_schema_service.dart';
 
 /// Provider that manages the state of study log entries.
 /// It interacts with the [StudyRepository] to persist data.
@@ -23,16 +24,17 @@ class StudyLogProvider extends ChangeNotifier {
 
   /// Returns logs filtered by a specific date.
   List<StudyLog> getLogsForDate(DateTime date) {
+    final target = _dateKey(date);
     return _logs.where((log) {
-      return log.date.year == date.year &&
-          log.date.month == date.month &&
-          log.date.day == date.day;
+      return _dateKey(log.date) == target;
     }).toList();
   }
 
   /// Calculates total study minutes for a specific date.
   int getStudyMinutesForDate(DateTime date) {
-    return getLogsForDate(date).fold(0, (sum, log) => sum + log.studyTimeMinutes);
+    return getLogsForDate(
+      date,
+    ).fold(0, (sum, log) => sum + log.studyTimeMinutes);
   }
 
   /// Calculates the current streak of consecutive days studied.
@@ -44,13 +46,17 @@ class StudyLogProvider extends ChangeNotifier {
         .map((l) => DateTime(l.date.year, l.date.month, l.date.day))
         .toSet();
 
-    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
     final yesterday = today.subtract(const Duration(days: 1));
 
     DateTime currentDateToCheck;
     int streak = 0;
 
-    // Logic: If today has a log, start from today. 
+    // Logic: If today has a log, start from today.
     // If not, check if yesterday has a log (maintain streak).
     if (uniqueDates.contains(today)) {
       currentDateToCheck = today;
@@ -68,6 +74,54 @@ class StudyLogProvider extends ChangeNotifier {
     }
 
     return streak;
+  }
+
+  /// Returns a map of date to total minutes for the heatmap.
+  Map<DateTime, int> get heatmapDataset {
+    final Map<DateTime, int> dataset = {};
+    for (var log in _logs) {
+      final date = _dateKey(log.date);
+      dataset[date] = (dataset[date] ?? 0) + log.studyTimeMinutes;
+    }
+    return dataset;
+  }
+
+  /// Returns total study minutes for the current week.
+  int get weeklyStudyMinutes {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday % 7));
+    final midnightStart = DateTime(
+      startOfWeek.year,
+      startOfWeek.month,
+      startOfWeek.day,
+    );
+
+    return _logs
+        .where(
+          (l) =>
+              l.date.isAfter(midnightStart) ||
+              l.date.isAtSameMomentAs(midnightStart),
+        )
+        .fold(0, (sum, log) => sum + log.studyTimeMinutes);
+  }
+
+  /// Returns total study minutes for the current month.
+  int get monthlyStudyMinutes {
+    final now = DateTime.now();
+    return _logs
+        .where((l) => l.date.year == now.year && l.date.month == now.month)
+        .fold(0, (sum, log) => sum + log.studyTimeMinutes);
+  }
+
+  /// Returns total study minutes for the previous month (for comparison).
+  int get previousMonthStudyMinutes {
+    final now = DateTime.now();
+    final prevMonth = now.month == 1 ? 12 : now.month - 1;
+    final year = now.month == 1 ? now.year - 1 : now.year;
+
+    return _logs
+        .where((l) => l.date.year == year && l.date.month == prevMonth)
+        .fold(0, (sum, log) => sum + log.studyTimeMinutes);
   }
 
   // ── Life Cycle ──
@@ -101,13 +155,57 @@ class StudyLogProvider extends ChangeNotifier {
   /// Saves a new study entry and triggers a Notion sync attempt.
   Future<bool> addLog(StudyLog log) async {
     try {
-      _logs.add(log);
+      final saved = await _repository.saveLog(log);
+      if (!saved) return false;
+
+      final existingIndex = _logs.indexWhere((l) => l.id == log.id);
+      if (existingIndex == -1) {
+        _logs.add(log);
+      } else {
+        _logs[existingIndex] = log;
+      }
       notifyListeners();
-      return await _repository.saveLog(log);
+      return true;
     } catch (e) {
       debugPrint('Error adding log: $e');
       return false;
     }
+  }
+
+  Future<bool> saveLocalLog(StudyLog log) => addLog(log);
+
+  Future<String?> syncLocalLogToNotion({
+    required StudyLog localLog,
+    required NotionDatabaseSchema notionSchema,
+    required String? notionTimeField,
+  }) async {
+    final notionRawValues = localLog.source == StudyLogSource.notion
+        ? localLog.rawValues
+        : LocalStudySchemaService.mapToNotionRawValues(
+            localValues: localLog.rawValues,
+            notionSchema: notionSchema,
+            notionTimeField: notionTimeField,
+          );
+    if (notionRawValues.isEmpty) return null;
+
+    final notionLog = StudyLog(
+      rawValues: notionRawValues,
+      schema: notionSchema,
+      localNote: localLog.localNote,
+      source: StudyLogSource.notion,
+      studyTimeField: notionTimeField,
+    );
+
+    final pageId = await NotionService().createStudyLog(notionLog);
+    if (pageId == null) return null;
+
+    final syncedLog = localLog.copyWith(
+      syncedWithNotion: true,
+      notionPageId: pageId,
+      source: localLog.source,
+    );
+    await updateLog(syncedLog);
+    return pageId;
   }
 
   /// Updates an existing log (e.g., after a manual sync).
@@ -141,7 +239,9 @@ class StudyLogProvider extends ChangeNotifier {
       final notionService = NotionService();
       final archived = await notionService.archivePage(log.notionPageId!);
       if (!archived) {
-        debugPrint('[StudyLogProvider] ⚠️ Notion archive failed, removing locally anyway.');
+        debugPrint(
+          '[StudyLogProvider] ⚠️ Notion archive failed, removing locally anyway.',
+        );
       }
     }
 
@@ -154,6 +254,15 @@ class StudyLogProvider extends ChangeNotifier {
   /// Loads the pre-existing schema from local cache.
   Future<void> loadSchemaFromCache() async {
     final storage = StorageService();
+    final token = await storage.getNotionToken();
+    final dbId = await storage.getNotionDatabaseId();
+    if (token == null || token.isEmpty || dbId == null || dbId.isEmpty) {
+      _cachedSchema = null;
+      await storage.clearNotionSchema();
+      notifyListeners();
+      return;
+    }
+
     final jsonString = await storage.getNotionSchema();
     if (jsonString != null && jsonString.isNotEmpty) {
       try {
@@ -165,9 +274,16 @@ class StudyLogProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> clearCachedSchema() async {
+    _cachedSchema = null;
+    await StorageService().clearNotionSchema();
+    notifyListeners();
+  }
+
   /// Syncs the Notion table schema (columns) with the API.
   Future<bool> syncSchemaFromNotion() async {
     _setLoading(true);
+    final previousSchema = _cachedSchema;
     try {
       final storage = StorageService();
       final dbId = await storage.getNotionDatabaseId();
@@ -175,15 +291,25 @@ class StudyLogProvider extends ChangeNotifier {
 
       final service = NotionService();
       final fetched = await service.fetchDatabaseSchema(dbId);
-      
+
       if (fetched != null) {
         _cachedSchema = fetched;
         await storage.saveNotionSchema(jsonEncode(fetched.toJson()));
         notifyListeners();
         return true;
       }
+      if (previousSchema == null) {
+        _cachedSchema = null;
+        await storage.clearNotionSchema();
+        notifyListeners();
+      }
       return false;
     } catch (e) {
+      if (previousSchema == null) {
+        _cachedSchema = null;
+        await StorageService().clearNotionSchema();
+        notifyListeners();
+      }
       debugPrint('Error syncing schema: $e');
       return false;
     } finally {
@@ -196,5 +322,10 @@ class StudyLogProvider extends ChangeNotifier {
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
+  }
+
+  DateTime _dateKey(DateTime value) {
+    final local = value.toLocal();
+    return DateTime(local.year, local.month, local.day);
   }
 }

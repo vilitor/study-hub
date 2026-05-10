@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:study_hub/config/app_theme.dart';
 import 'package:study_hub/config/app_routes.dart';
+import 'package:study_hub/providers/auth_session_provider.dart';
 import 'package:study_hub/providers/study_event_provider.dart';
 import 'package:study_hub/providers/study_log_provider.dart';
+import 'package:study_hub/providers/certificate_provider.dart';
+import 'package:study_hub/providers/local_study_schema_provider.dart';
+import 'package:study_hub/providers/navigation_provider.dart';
 import 'package:study_hub/providers/settings_provider.dart';
 import 'package:study_hub/providers/study_timer_provider.dart';
 import 'package:study_hub/providers/goal_provider.dart';
+import 'package:study_hub/services/app_haptics.dart';
 import 'package:study_hub/screens/home/home_screen.dart';
+import 'package:study_hub/screens/achievements/achievements_screen.dart';
 import 'package:study_hub/screens/create_event/create_event_screen.dart';
 import 'package:study_hub/screens/study_log/study_log_screen.dart';
 import 'package:study_hub/screens/settings/settings_screen.dart';
 import 'package:study_hub/screens/history/registration_history_screen.dart';
+import 'package:study_hub/screens/performance/performance_screen.dart';
+import 'package:study_hub/screens/splash/app_splash_screen.dart';
 import 'package:study_hub/widgets/floating_nav_bar.dart';
 import 'package:study_hub/widgets/floating_timer_bar.dart';
 
@@ -25,6 +34,7 @@ void main() async {
 
   // Inicializa dados de localização (para datas em português)
   await initializeDateFormatting('pt_BR', null);
+  await Firebase.initializeApp();
 
   // Define a barra de status como transparente
   SystemChrome.setSystemUIOverlayStyle(
@@ -47,11 +57,17 @@ class StudyHubApp extends StatelessWidget {
     // Os widgets filhos podem acessar esses providers com context.read ou Consumer
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthSessionProvider()),
         ChangeNotifierProvider(create: (_) => StudyEventProvider()),
         ChangeNotifierProvider(create: (_) => StudyLogProvider()),
-        ChangeNotifierProvider(create: (_) => SettingsProvider()..loadSettings()),
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider()..loadSettings(),
+        ),
         ChangeNotifierProvider(create: (_) => StudyTimerProvider()),
         ChangeNotifierProvider(create: (_) => GoalProvider()),
+        ChangeNotifierProvider(create: (_) => CertificateProvider()),
+        ChangeNotifierProvider(create: (_) => LocalStudySchemaProvider()),
+        ChangeNotifierProvider(create: (_) => NavigationProvider()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
@@ -65,11 +81,11 @@ class StudyHubApp extends StatelessWidget {
             themeMode: settings.themeMode == 'dark'
                 ? ThemeMode.dark
                 : settings.themeMode == 'light'
-                    ? ThemeMode.light
-                    : ThemeMode.system,
+                ? ThemeMode.light
+                : ThemeMode.light,
 
             // Tela inicial com navegação por abas
-            home: const MainNavigationScreen(),
+            home: const AppSplashScreen(destination: MainNavigationScreen()),
 
             // Rotas nomeadas para navegação entre telas
             routes: {
@@ -77,6 +93,7 @@ class StudyHubApp extends StatelessWidget {
               AppRoutes.studyLog: (context) => const StudyLogScreen(),
               AppRoutes.settings: (context) => const SettingsScreen(),
               AppRoutes.history: (context) => const RegistrationHistoryScreen(),
+              AppRoutes.achievements: (context) => const AchievementsScreen(),
             },
           );
         },
@@ -95,40 +112,46 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
-
   // Telas que aparecem no body conforme a aba selecionada
   final List<Widget> _screens = const [
     HomeScreen(),
+    PerformanceScreen(),
     CreateEventScreen(),
     StudyLogScreen(),
     SettingsScreen(),
   ];
 
   final List<NavItem> _navItems = [
-    NavItem(icon: Icons.home_rounded, label: 'Home'),
+    NavItem(icon: Icons.home_rounded, label: 'Início'),
+    NavItem(icon: Icons.auto_graph_rounded, label: 'Desempenho'),
     NavItem(icon: Icons.calendar_month_rounded, label: 'Agenda'),
     NavItem(icon: Icons.edit_note_rounded, label: 'Registro'),
-    NavItem(icon: Icons.settings_rounded, label: 'Config'),
+    NavItem(icon: Icons.settings_rounded, label: 'Configurações'),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final navigation = context.watch<NavigationProvider>();
     return PopScope(
-      canPop: _currentIndex == 0,
+      canPop: navigation.currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        if (_currentIndex != 0) {
-          setState(() => _currentIndex = 0);
+        if (navigation.currentIndex != 0) {
+          context.read<NavigationProvider>().resetToHome();
         }
       },
       child: Scaffold(
         extendBody: true,
         body: Stack(
           children: [
-            IndexedStack(
-              index: _currentIndex,
-              children: _screens,
+            NotificationListener<ScrollNotification>(
+              onNotification: context
+                  .read<NavigationProvider>()
+                  .handleScrollNotification,
+              child: IndexedStack(
+                index: navigation.currentIndex,
+                children: _screens,
+              ),
             ),
             // Floating timer bar — appears above nav when timer is active
             const Positioned(
@@ -137,14 +160,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               bottom: 0,
               child: FloatingTimerBar(),
             ),
-          ],
-        ),
 
-        // Barra de Navegação Flutuante Premium
-        bottomNavigationBar: FloatingNavBar(
-          currentIndex: _currentIndex,
-          items: _navItems,
-          onTap: (index) => setState(() => _currentIndex = index),
+            // Floating Navigation Bar — moved from Scaffold slot to Stack for better transparency
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: FloatingNavBar(
+                currentIndex: navigation.currentIndex,
+                isVisible: navigation.isNavVisible,
+                items: _navItems,
+                onTap: (index) {
+                  AppHaptics.selection();
+                  context.read<NavigationProvider>().setIndex(index);
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

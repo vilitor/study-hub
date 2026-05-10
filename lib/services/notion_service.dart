@@ -47,7 +47,9 @@ class NotionService {
         final body = jsonDecode(response.body);
         return body['id'] as String?;
       } else {
-        debugPrint('[NotionService] Failed to create page. Status: ${response.statusCode}');
+        debugPrint(
+          '[NotionService] Failed to create page. Status: ${response.statusCode}',
+        );
         return null;
       }
     } catch (e) {
@@ -72,7 +74,9 @@ class NotionService {
         debugPrint('[NotionService] ✅ Page $pageId archived.');
         return true;
       } else {
-        debugPrint('[NotionService] ❌ Failed to archive page. Status: ${response.statusCode}');
+        debugPrint(
+          '[NotionService] ❌ Failed to archive page. Status: ${response.statusCode}',
+        );
         return false;
       }
     } catch (e) {
@@ -116,7 +120,9 @@ class NotionService {
         final decodedBody = jsonDecode(response.body);
         return NotionDatabaseSchema.fromJson(decodedBody);
       } else {
-        debugPrint('[NotionService] Schema fetch failed. Status: ${response.statusCode}');
+        debugPrint(
+          '[NotionService] Schema fetch failed. Status: ${response.statusCode}',
+        );
         return null;
       }
     } catch (e) {

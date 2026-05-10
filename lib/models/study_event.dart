@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:study_hub/models/cloud_sync.dart';
 
 /// Modelo: Evento de Estudo
 /// Representa uma sessão de estudo agendada na agenda/calendário
@@ -15,6 +16,11 @@ class StudyEvent {
   final int reminderMinutes; // Lembrete (minutos antes)
   final String? calendarEventId; // ID do evento no Google Calendar
   final bool syncedWithCalendar; // Se já foi enviado ao Calendar
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final CloudSyncStatus syncStatus;
+  final String? remoteId;
+  final DateTime? lastSyncedAt;
 
   StudyEvent({
     String? id,
@@ -28,7 +34,13 @@ class StudyEvent {
     this.reminderMinutes = 15,
     this.calendarEventId,
     this.syncedWithCalendar = false,
-  }) : id = id ?? const Uuid().v4();
+    DateTime? updatedAt,
+    this.deletedAt,
+    this.syncStatus = CloudSyncStatus.localOnly,
+    this.remoteId,
+    this.lastSyncedAt,
+  }) : id = id ?? const Uuid().v4(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   /// Calcula a duração automaticamente a partir de startTime e endTime
   int get calculatedDurationMinutes {
@@ -54,21 +66,16 @@ class StudyEvent {
 
   /// Converte startTime para DateTime completo (data + hora)
   DateTime get startDateTime => DateTime(
-        date.year,
-        date.month,
-        date.day,
-        startTime.hour,
-        startTime.minute,
-      );
+    date.year,
+    date.month,
+    date.day,
+    startTime.hour,
+    startTime.minute,
+  );
 
   /// Converte endTime para DateTime completo
-  DateTime get endDateTime => DateTime(
-        date.year,
-        date.month,
-        date.day,
-        endTime.hour,
-        endTime.minute,
-      );
+  DateTime get endDateTime =>
+      DateTime(date.year, date.month, date.day, endTime.hour, endTime.minute);
 
   /// Cria uma cópia do evento com campos alterados
   StudyEvent copyWith({
@@ -82,6 +89,14 @@ class StudyEvent {
     int? reminderMinutes,
     String? calendarEventId,
     bool? syncedWithCalendar,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
+    CloudSyncStatus? syncStatus,
+    String? remoteId,
+    bool clearRemoteId = false,
+    DateTime? lastSyncedAt,
+    bool clearLastSyncedAt = false,
   }) {
     return StudyEvent(
       id: id,
@@ -95,6 +110,13 @@ class StudyEvent {
       reminderMinutes: reminderMinutes ?? this.reminderMinutes,
       calendarEventId: calendarEventId ?? this.calendarEventId,
       syncedWithCalendar: syncedWithCalendar ?? this.syncedWithCalendar,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: clearDeletedAt ? null : deletedAt ?? this.deletedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      remoteId: clearRemoteId ? null : remoteId ?? this.remoteId,
+      lastSyncedAt: clearLastSyncedAt
+          ? null
+          : lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 
@@ -114,17 +136,23 @@ class StudyEvent {
       'reminderMinutes': reminderMinutes,
       'calendarEventId': calendarEventId,
       'syncedWithCalendar': syncedWithCalendar,
+      'updatedAt': updatedAt.toIso8601String(),
+      'deletedAt': deletedAt?.toIso8601String(),
+      'syncStatus': syncStatus.name,
+      'remoteId': remoteId,
+      'lastSyncedAt': lastSyncedAt?.toIso8601String(),
     };
   }
 
   /// Cria um StudyEvent a partir de um Map
   factory StudyEvent.fromMap(Map<String, dynamic> map) {
+    final parsedDate = DateTime.parse(map['date'] as String);
     return StudyEvent(
       id: map['id'] as String,
       subject: map['subject'] as String,
       title: map['title'] as String,
       description: map['description'] as String? ?? '',
-      date: DateTime.parse(map['date'] as String),
+      date: parsedDate,
       startTime: TimeOfDay(
         hour: map['startTimeHour'] as int,
         minute: map['startTimeMinute'] as int,
@@ -137,9 +165,19 @@ class StudyEvent {
       reminderMinutes: map['reminderMinutes'] as int? ?? 15,
       calendarEventId: map['calendarEventId'] as String?,
       syncedWithCalendar: map['syncedWithCalendar'] as bool? ?? false,
+      updatedAt:
+          DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? parsedDate,
+      deletedAt: DateTime.tryParse(map['deletedAt']?.toString() ?? ''),
+      syncStatus: CloudSyncStatus.values.firstWhere(
+        (status) => status.name == map['syncStatus'],
+        orElse: () => CloudSyncStatus.localOnly,
+      ),
+      remoteId: map['remoteId']?.toString(),
+      lastSyncedAt: DateTime.tryParse(map['lastSyncedAt']?.toString() ?? ''),
     );
   }
 
   @override
-  String toString() => 'StudyEvent($subject: $title em ${date.day}/${date.month})';
+  String toString() =>
+      'StudyEvent($subject: $title em ${date.day}/${date.month})';
 }

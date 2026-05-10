@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:study_hub/config/app_theme.dart';
 
-/// Campo de texto personalizado com label, ícone e validação
 class CustomTextField extends StatelessWidget {
   final String label;
   final String? hint;
   final IconData? prefixIcon;
   final TextEditingController? controller;
+  final FocusNode? focusNode;
   final String? Function(String?)? validator;
   final TextInputType keyboardType;
   final int maxLines;
@@ -21,6 +22,7 @@ class CustomTextField extends StatelessWidget {
     this.hint,
     this.prefixIcon,
     this.controller,
+    this.focusNode,
     this.validator,
     this.keyboardType = TextInputType.text,
     this.maxLines = 1,
@@ -33,24 +35,18 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Label acima do campo
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
+          padding: EdgeInsets.only(left: spacing.xxs, bottom: spacing.xs),
+          child: Text(label, style: context.theme.textTheme.titleSmall),
         ),
-
-        // Campo de texto
         TextFormField(
-          initialValue: initialValue,
+          initialValue: controller == null ? initialValue : null,
           controller: controller,
+          focusNode: focusNode,
           validator: validator,
           keyboardType: keyboardType,
           maxLines: maxLines,
@@ -58,11 +54,10 @@ class CustomTextField extends StatelessWidget {
           onChanged: onChanged,
           readOnly: readOnly,
           onTap: onTap,
+          style: context.theme.textTheme.bodyMedium,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: prefixIcon != null
-                ? Icon(prefixIcon, size: 20)
-                : null,
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
           ),
         ),
       ],

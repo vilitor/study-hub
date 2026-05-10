@@ -10,7 +10,11 @@ class Validators {
   }
 
   /// Tamanho mínimo
-  static String? minLength(String? value, int min, [String fieldName = 'Este campo']) {
+  static String? minLength(
+    String? value,
+    int min, [
+    String fieldName = 'Este campo',
+  ]) {
     if (value == null || value.trim().length < min) {
       return '$fieldName deve ter pelo menos $min caracteres';
     }
@@ -18,7 +22,12 @@ class Validators {
   }
 
   /// Valida que hora fim é depois da hora início
-  static String? timeRange(int startHour, int startMin, int endHour, int endMin) {
+  static String? timeRange(
+    int startHour,
+    int startMin,
+    int endHour,
+    int endMin,
+  ) {
     final start = startHour * 60 + startMin;
     final end = endHour * 60 + endMin;
     if (end <= start) {

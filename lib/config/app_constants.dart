@@ -23,6 +23,8 @@ class AppConstants {
 
   // ── Google Calendar ──
   static const String calendarId = 'primary'; // User's primary calendar
+  static const String googleWebClientId =
+      '539437186516-7a8kisrn4laf16d676uvalvgh0hdlp2o.apps.googleusercontent.com';
 
   // ── Secure Storage Keys ──
   static const String storageKeyNotionToken = 'notion_token';
@@ -59,6 +61,6 @@ class AppConstants {
     'Java',
     'Kotlin',
     'Git',
-    'Other',
+    'Outros',
   ];
 }

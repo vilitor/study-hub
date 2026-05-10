@@ -1,40 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:study_hub/config/app_routes.dart';
 import 'package:study_hub/config/app_theme.dart';
+import 'package:study_hub/models/auth_session.dart';
+import 'package:study_hub/providers/auth_session_provider.dart';
 import 'package:study_hub/providers/settings_provider.dart';
-import 'package:study_hub/providers/study_log_provider.dart';
-import 'package:study_hub/widgets/custom_button.dart';
-import 'package:study_hub/widgets/custom_text_field.dart';
-import 'package:study_hub/utils/validators.dart';
-import 'package:study_hub/utils/snackbar_helper.dart';
-import 'package:study_hub/services/notion_service.dart';
 import 'package:study_hub/screens/settings/privacy_policy_screen.dart';
+import 'package:study_hub/services/app_haptics.dart';
+import 'package:study_hub/utils/snackbar_helper.dart';
+import 'package:study_hub/widgets/app_modal.dart';
+import 'package:study_hub/widgets/app_surface.dart';
+import 'package:study_hub/widgets/custom_button.dart';
+import 'package:study_hub/widgets/integration_button.dart';
+import 'package:study_hub/widgets/local_table_schema_sheet.dart';
+import 'package:study_hub/widgets/notion_connection_sheet.dart';
 
-/// Tela: Configurações
-/// Conectar Google, configurar Notion, visualizar status das integrações
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  final _notionTokenController = TextEditingController();
-  final _notionDbIdController = TextEditingController();
-
-  @override
-  void dispose() {
-    _notionTokenController.dispose();
-    _notionDbIdController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configurações'),
+        title: const Text('Configuracoes'),
         leading: Navigator.canPop(context)
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
@@ -44,257 +33,149 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
+          AuthSessionProvider? auth;
+          try {
+            auth = context.watch<AuthSessionProvider>();
+          } on ProviderNotFoundException {
+            auth = null;
+          }
+
+          final googleConnected =
+              settings.isGoogleConnected || (auth?.isSignedIn ?? false);
+          final googleEmail = auth?.email ?? settings.settings.googleEmail;
+          final pendingSync = auth?.pendingSyncCount ?? 0;
+          final googleSubtitle = googleConnected
+              ? 'Firebase e Calendar: $googleEmail${pendingSync > 0 ? ' | $pendingSync pendente(s)' : ''}'
+              : 'Entrar para backup Firebase e sincronizar Calendar.';
+
           return SingleChildScrollView(
-            padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 140),
+            padding: EdgeInsets.fromLTRB(
+              spacing.screenPadding,
+              spacing.lg,
+              spacing.screenPadding,
+              140,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Status das integrações ──
-                Text(
-                  'Status das Integrações',
-                  style: Theme.of(context).textTheme.titleLarge,
+                const AppSectionHeader(
+                  title: 'Integracoes',
+                  subtitle:
+                      'Gerencie Google Calendar e Notion sem poluir o app.',
                 ),
-                const SizedBox(height: 12),
-                _buildStatusCard(
-                  icon: Icons.event_rounded,
+                SizedBox(height: spacing.md),
+                IntegrationButton(
+                  mark: const GoogleBrandMark(),
                   title: 'Google Calendar',
-                  subtitle: settings.isGoogleConnected
-                      ? 'Conectado: ${settings.settings.googleEmail}'
-                      : 'Não conectado',
-                  isConnected: settings.isGoogleConnected,
+                  subtitle: googleSubtitle,
+                  isConnected: googleConnected,
+                  isLoading:
+                      settings.isLoading ||
+                      auth?.status == AuthSessionStatus.signingIn,
+                  accentColor: const Color(0xFF4285F4),
+                  onTap: () => _handleGoogle(context, settings, auth),
                 ),
-                const SizedBox(height: 8),
-                _buildStatusCard(
-                  icon: Icons.storage_rounded,
+                SizedBox(height: spacing.sm),
+                IntegrationButton(
+                  mark: const NotionBrandMark(),
                   title: 'Notion',
                   subtitle: settings.isNotionConnected
-                      ? 'Conectado ao database'
-                      : 'Não conectado',
+                      ? 'Tabela conectada. Sync por registro.'
+                      : 'Opcional: conecte para sincronizar registros.',
                   isConnected: settings.isNotionConnected,
+                  accentColor: context.colors.textPrimary,
+                  onTap: () => NotionConnectionSheet.show(context),
                 ),
-
-                const SizedBox(height: 32),
-
-                // ── Seção Google ──
-                Text(
-                  'Tema',
-                  style: Theme.of(context).textTheme.titleLarge,
+                SizedBox(height: spacing.sm),
+                IntegrationButton(
+                  mark: Icon(
+                    Icons.table_chart_rounded,
+                    color: context.colors.accent,
+                  ),
+                  title: 'Tabela local',
+                  subtitle: 'Editar campos usados nos registros locais.',
+                  isConnected: true,
+                  accentColor: context.colors.accent,
+                  onTap: () => LocalTableSchemaSheet.show(context),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Modo Escuro',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                SizedBox(height: spacing.sectionGap),
+                const AppSectionHeader(
+                  title: 'Atalhos',
+                  subtitle: 'Acesse dados importantes rapidamente.',
+                ),
+                SizedBox(height: spacing.md),
+                AppSurface(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.history_rounded,
+                      color: context.colors.accent,
                     ),
-                    Switch(
-                      value: settings.themeMode == 'dark',
-                      activeThumbColor: AppColors.primaryGreen,
-                      onChanged: (isDark) {
-                        settings.setThemeMode(isDark ? 'dark' : 'light');
-                      },
+                    title: const Text('Historico de registros'),
+                    subtitle: const Text(
+                      'Ver, editar notas e excluir registros.',
                     ),
-                  ],
+                    trailing: const Icon(Icons.arrow_forward_rounded),
+                    onTap: () {
+                      AppHaptics.selection();
+                      Navigator.pushNamed(context, AppRoutes.history);
+                    },
+                  ),
                 ),
-
-                const SizedBox(height: 32),
-
-                // ── Seção Google ──
-                Text(
-                  'Google Calendar',
-                  style: Theme.of(context).textTheme.titleLarge,
+                SizedBox(height: spacing.sectionGap),
+                const AppSectionHeader(
+                  title: 'Tema',
+                  subtitle: 'Alterne entre claro e escuro.',
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Conecte sua conta Google para sincronizar eventos de estudo com seu calendário.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-                CustomButton(
-                  label: settings.isGoogleConnected
-                      ? 'Desconectar Google'
-                      : 'Conectar com Google',
-                  icon: settings.isGoogleConnected
-                      ? Icons.logout_rounded
-                      : Icons.login_rounded,
-                  color: settings.isGoogleConnected
-                      ? AppColors.error
-                      : AppColors.primaryGreen,
-                  isLoading: settings.isLoading,
-                  onPressed: () async {
-                    if (settings.isGoogleConnected) {
-                      await settings.disconnectGoogle();
-                      if (context.mounted) {
-                        SnackbarHelper.showInfo(context, 'Google desconectado');
-                      }
-                    } else {
-                      try {
-                        await settings.connectGoogle();
-                        if (context.mounted && settings.isGoogleConnected) {
-                          SnackbarHelper.showSuccess(context, 'Conectado com sucesso! ✅');
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          SnackbarHelper.showError(context, 'Erro ao conectar. Tente novamente.');
-                        }
-                      }
-                    }
-                  },
-                ),
-
-                const SizedBox(height: 32),
-
-                // ── Seção Notion ──
-                Text(
-                  'Notion',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Insira o token da sua integração e o ID do database para salvar registros de aprendizado no Notion.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-
-                CustomTextField(
-                  label: 'Token de Integração',
-                  hint: 'ntn_xxxxxxxxxxxx...',
-                  prefixIcon: Icons.key_rounded,
-                  controller: _notionTokenController,
-                  validator: Validators.notionToken,
-                  obscureText: true,
-                ),
-
-                const SizedBox(height: 16),
-
-                CustomTextField(
-                  label: 'Database ID',
-                  hint: 'ID do database (32 caracteres)',
-                  prefixIcon: Icons.storage_rounded,
-                  controller: _notionDbIdController,
-                  validator: Validators.notionDatabaseId,
-                ),
-
-                const SizedBox(height: 16),
-
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    CustomButton(
-                      label: 'Salvar',
-                      icon: Icons.save_rounded,
-                      onPressed: () => _saveNotionConfig(settings),
-                    ),
-                    if (settings.isNotionConnected) ...[
-                      const SizedBox(height: 12),
-                      CustomButton(
-                        label: 'Desconectar',
-                        icon: Icons.link_off_rounded,
-                        isOutlined: true,
-                        color: AppColors.error,
-                        onPressed: () {
-                          settings.disconnectNotion();
-                          _notionTokenController.clear();
-                          _notionDbIdController.clear();
-                          SnackbarHelper.showInfo(
-                              context, 'Notion desconectado');
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    CustomButton(
-                      label: 'Sincronizar Tabela',
-                      icon: Icons.sync_rounded,
-                      isOutlined: false,
-                      color: AppColors.primaryGreen,
-                      onPressed: () async {
-                        final provider = context.read<StudyLogProvider>();
-                        final success = await provider.syncSchemaFromNotion();
-                        if (context.mounted) {
-                          if (success) {
-                            SnackbarHelper.showSuccess(context, 'Estrutura atualizada e cacheada com sucesso! ✅');
-                          } else {
-                            SnackbarHelper.showError(context, 'Falha ao sincronizar estrutura.');
-                          }
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    CustomButton(
-                      label: 'Testar Conexão Notion',
-                      icon: Icons.wifi_tethering_rounded,
-                      isOutlined: true,
-                      color: AppColors.purple,
-                      onPressed: () async {
-                        if (_notionTokenController.text.isEmpty || _notionDbIdController.text.isEmpty) {
-                          SnackbarHelper.showWarning(context, 'Preencha o Token e o Database ID primeiro');
-                          return;
-                        }
-                        
-                        final notionService = NotionService();
-                        final isOk = await notionService.testConnection(
-                          _notionTokenController.text.trim(),
-                          _notionDbIdController.text.trim(),
-                        );
-                        
-                        if (context.mounted) {
-                          if (isOk) {
-                            SnackbarHelper.showSuccess(context, 'Conexão perfeita! Database acessível. 🚀');
-                          } else {
-                            SnackbarHelper.showError(context, 'Falha na conexão. Verifique suas chaves e se a Integração foi adicionada ao Database.');
-                          }
-                        }
-                      },
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 32),
-
-                // ── Sobre o app ──
-                Center(
-                  child: Column(
+                SizedBox(height: spacing.md),
+                AppSurface(
+                  child: Row(
                     children: [
-                      const SizedBox(height: 24),
-                      TextButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const PrivacyPolicyScreen(),
-                          ),
-                        ),
-                        icon: const Icon(Icons.privacy_tip_rounded, size: 20),
-                        label: const Text('Data Privacy & Security (LGPD)'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primaryGreen,
+                      Expanded(
+                        child: Text(
+                          settings.themeMode == 'dark'
+                              ? 'Modo escuro'
+                              : 'Modo claro',
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'StudyHub v1.0.0',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textHint,
-                            ),
-                      ),
-                      Text(
-                        'Feito com 💚 para organizar seus estudos',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textHint,
-                            ),
+                      IconButton(
+                        onPressed: () {
+                          AppHaptics.selection();
+                          settings.setThemeMode(
+                            settings.themeMode == 'dark' ? 'light' : 'dark',
+                          );
+                        },
+                        icon: Icon(
+                          settings.themeMode == 'dark'
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded,
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 24),
+                SizedBox(height: spacing.sectionGap),
+                AppSurface(
+                  child: Column(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => const PrivacyPolicyScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.privacy_tip_rounded),
+                        label: const Text('Privacidade e seguranca dos dados'),
+                      ),
+                      SizedBox(height: spacing.sm),
+                      Text(
+                        'StudyHub v1.1.0',
+                        style: context.theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -303,89 +184,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Card de status de integração
-  Widget _buildStatusCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isConnected,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isConnected
-              ? AppColors.success.withValues(alpha: 0.3)
-              : Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isConnected
-                  ? AppColors.success.withValues(alpha: 0.1)
-                  : Theme.of(context).dividerTheme.color ?? AppColors.cardGrey,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              color: isConnected ? AppColors.success : AppColors.textHint,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            isConnected
-                ? Icons.check_circle_rounded
-                : Icons.cancel_rounded,
-            color: isConnected ? AppColors.success : AppColors.textHint,
-            size: 24,
-          ),
-        ],
-      ),
-    );
+  Future<void> _handleGoogle(
+    BuildContext context,
+    SettingsProvider settings,
+    AuthSessionProvider? auth,
+  ) async {
+    if (settings.isGoogleConnected || (auth?.isSignedIn ?? false)) {
+      await _showGoogleManageSheet(context, settings, auth);
+      return;
+    }
+
+    try {
+      bool success;
+      if (auth == null) {
+        await settings.connectGoogle();
+        success = settings.isGoogleConnected;
+      } else {
+        success = await auth.signInWithGoogle();
+      }
+      if (!context.mounted) return;
+
+      if (success) {
+        if (auth != null && auth.email != null) {
+          await settings.setGoogleConnected(
+            auth.email!,
+            auth.displayName ?? '',
+            auth.photoUrl ?? '',
+          );
+          if (!context.mounted) return;
+        }
+        AppHaptics.success();
+        SnackbarHelper.showSuccess(context, 'Conectado com sucesso.');
+      } else if (auth?.lastDiagnostic != null) {
+        SnackbarHelper.showError(context, auth!.lastDiagnostic!.message);
+      }
+    } catch (_) {
+      if (context.mounted) {
+        SnackbarHelper.showError(context, 'Erro ao conectar com Google.');
+      }
+    }
   }
 
-  void _saveNotionConfig(SettingsProvider settings) {
-    final tokenError = Validators.notionToken(_notionTokenController.text);
-    final dbError = Validators.notionDatabaseId(_notionDbIdController.text);
-
-    if (tokenError != null) {
-      SnackbarHelper.showError(context, tokenError);
-      return;
-    }
-    if (dbError != null) {
-      SnackbarHelper.showError(context, dbError);
-      return;
-    }
-
-    settings.saveNotionCredentials(
-      _notionTokenController.text.trim(),
-      _notionDbIdController.text.trim(),
+  Future<void> _showGoogleManageSheet(
+    BuildContext context,
+    SettingsProvider settings,
+    AuthSessionProvider? auth,
+  ) async {
+    AppHaptics.selection();
+    await AppModal.showSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        return AppSurface(
+          color: sheetContext.colors.modalSurface,
+          shadow: sheetContext.elevations.high,
+          padding: EdgeInsets.all(sheetContext.spacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppSectionHeader(
+                title: 'Google Calendar',
+                subtitle:
+                    auth?.email ??
+                    settings.settings.googleEmail ??
+                    'Conta Google conectada.',
+                trailing: IconButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ),
+              SizedBox(height: sheetContext.spacing.lg),
+              IntegrationButton(
+                mark: const GoogleBrandMark(),
+                title: 'Eventos sincronizados',
+                subtitle:
+                    'Backup Firebase ativo. Novos eventos continuam usando Google Calendar.',
+                isConnected: true,
+                accentColor: const Color(0xFF4285F4),
+                onTap: null,
+              ),
+              SizedBox(height: sheetContext.spacing.lg),
+              CustomButton(
+                label: 'Desconectar Google',
+                icon: Icons.logout_rounded,
+                isOutlined: true,
+                color: sheetContext.colors.error,
+                onPressed: () async {
+                  await AppHaptics.warning();
+                  if (auth != null) {
+                    await auth.signOut();
+                  }
+                  await settings.disconnectGoogle();
+                  if (!sheetContext.mounted) return;
+                  Navigator.pop(sheetContext);
+                  if (context.mounted) {
+                    SnackbarHelper.showInfo(context, 'Google desconectado.');
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
-
-    SnackbarHelper.showSuccess(context, 'Notion configurado com sucesso! ✅');
   }
 }

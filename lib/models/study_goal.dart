@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:study_hub/models/cloud_sync.dart';
 
 /// Type of study goal period.
 enum GoalType { weekly, monthly }
@@ -11,6 +12,11 @@ class StudyGoal {
   final List<String> languages;
   final DateTime periodStart; // Start of the week (Sunday) or month (1st)
   final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final CloudSyncStatus syncStatus;
+  final String? remoteId;
+  final DateTime? lastSyncedAt;
 
   StudyGoal({
     String? id,
@@ -19,14 +25,28 @@ class StudyGoal {
     required this.languages,
     required this.periodStart,
     DateTime? createdAt,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now();
+    DateTime? updatedAt,
+    this.deletedAt,
+    this.syncStatus = CloudSyncStatus.localOnly,
+    this.remoteId,
+    this.lastSyncedAt,
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   StudyGoal copyWith({
     GoalType? type,
     int? targetMinutes,
     List<String>? languages,
     DateTime? periodStart,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
+    CloudSyncStatus? syncStatus,
+    String? remoteId,
+    bool clearRemoteId = false,
+    DateTime? lastSyncedAt,
+    bool clearLastSyncedAt = false,
   }) {
     return StudyGoal(
       id: id,
@@ -35,6 +55,13 @@ class StudyGoal {
       languages: languages ?? this.languages,
       periodStart: periodStart ?? this.periodStart,
       createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: clearDeletedAt ? null : deletedAt ?? this.deletedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      remoteId: clearRemoteId ? null : remoteId ?? this.remoteId,
+      lastSyncedAt: clearLastSyncedAt
+          ? null
+          : lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 
@@ -51,7 +78,11 @@ class StudyGoal {
   /// Checks if this goal covers the given date.
   bool coversDate(DateTime date) {
     final d = DateTime(date.year, date.month, date.day);
-    final start = DateTime(periodStart.year, periodStart.month, periodStart.day);
+    final start = DateTime(
+      periodStart.year,
+      periodStart.month,
+      periodStart.day,
+    );
     final end = periodEnd;
     return !d.isBefore(start) && d.isBefore(end);
   }
@@ -63,8 +94,19 @@ class StudyGoal {
       return '${periodStart.day}/${periodStart.month} - ${end.day}/${end.month}';
     } else {
       const months = [
-        '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+        '',
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
       ];
       return '${months[periodStart.month]} ${periodStart.year}';
     }
@@ -79,18 +121,35 @@ class StudyGoal {
       'languages': languages,
       'periodStart': periodStart.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'deletedAt': deletedAt?.toIso8601String(),
+      'syncStatus': syncStatus.name,
+      'remoteId': remoteId,
+      'lastSyncedAt': lastSyncedAt?.toIso8601String(),
     };
   }
 
   /// Deserializes from a Map.
   factory StudyGoal.fromMap(Map<String, dynamic> map) {
+    final parsedCreatedAt =
+        DateTime.tryParse(map['createdAt']?.toString() ?? '') ?? DateTime.now();
     return StudyGoal(
       id: map['id'] as String,
       type: map['type'] == 'weekly' ? GoalType.weekly : GoalType.monthly,
       targetMinutes: map['targetMinutes'] as int,
       languages: List<String>.from(map['languages'] as List),
       periodStart: DateTime.parse(map['periodStart'] as String),
-      createdAt: DateTime.parse(map['createdAt'] as String),
+      createdAt: parsedCreatedAt,
+      updatedAt:
+          DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
+          parsedCreatedAt,
+      deletedAt: DateTime.tryParse(map['deletedAt']?.toString() ?? ''),
+      syncStatus: CloudSyncStatus.values.firstWhere(
+        (status) => status.name == map['syncStatus'],
+        orElse: () => CloudSyncStatus.localOnly,
+      ),
+      remoteId: map['remoteId']?.toString(),
+      lastSyncedAt: DateTime.tryParse(map['lastSyncedAt']?.toString() ?? ''),
     );
   }
 

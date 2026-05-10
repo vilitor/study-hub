@@ -8,55 +8,66 @@ class PrivacyPolicyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Data Privacy & Security'),
-      ),
+      appBar: AppBar(title: const Text('Privacidade e segurança')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.security_rounded, size: 64, color: AppColors.primaryGreen),
+            const Icon(
+              Icons.security_rounded,
+              size: 64,
+              color: AppColors.primaryGreen,
+            ),
             const SizedBox(height: 24),
             Text(
-              'Your Privacy is Our Priority',
+              'Sua privacidade é prioridade',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
             Text(
-              'StudyHub is designed with transparency and security in mind. This screen explains how we handle your information in accordance with Data Protection best practices.',
-              style: TextStyle(fontSize: 16, color: Theme.of(context).textTheme.bodyMedium?.color),
+              'O StudyHub foi projetado com transparência e segurança. Esta tela explica como suas informações são tratadas de acordo com boas práticas de proteção de dados.',
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
             ),
             const SizedBox(height: 32),
             _buildSection(
               context,
               icon: Icons.storage_rounded,
-              title: 'Local Storage',
-              content: 'All your study logs and agenda events are stored locally on your device. We do not have a central database that monitors your study habits.',
+              title: 'Armazenamento local',
+              content:
+                  'Seus registros de estudo e eventos da agenda ficam armazenados localmente no dispositivo. O app não mantém um banco central para monitorar seus hábitos de estudo.',
             ),
             _buildSection(
               context,
               icon: Icons.phonelink_lock_rounded,
-              title: 'Secure Credentials',
-              content: 'Sensitive data such as your Notion Token is encrypted and stored using hardware-backed secure storage (Flutter Secure Storage).',
+              title: 'Credenciais seguras',
+              content:
+                  'Dados sensíveis, como o token do Notion, são criptografados e armazenados com armazenamento seguro do dispositivo.',
             ),
             _buildSection(
               context,
               icon: Icons.sync_rounded,
-              title: 'Integration Transparency',
-              content: 'Data is only transmitted to third-party services (Notion and Google Calendar) when you explicitly authorize and trigger a synchronization.',
+              title: 'Integrações transparentes',
+              content:
+                  'Os dados só são enviados ao Notion ou Google Calendar quando você autoriza e inicia uma sincronização.',
             ),
             _buildSection(
               context,
               icon: Icons.no_accounts_rounded,
-              title: 'No Data Selling',
-              content: 'We do not collect, sell, or share your data with advertisers or any other third parties. Your data belongs entirely to you.',
+              title: 'Sem venda de dados',
+              content:
+                  'O app não coleta, vende ou compartilha seus dados com anunciantes. Seus dados pertencem a você.',
             ),
             const SizedBox(height: 40),
             Center(
               child: Text(
-                'v1.0.0 • LGPD Compliant Architecture',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+                'v1.0.0 • Arquitetura compatível com a LGPD',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
               ),
             ),
             const SizedBox(height: 24),
@@ -66,7 +77,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(BuildContext context, {required IconData icon, required String title, required String content}) {
+  Widget _buildSection(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String content,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Row(
@@ -80,12 +96,18 @@ class PrivacyPolicyScreen extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   content,
-                  style: TextStyle(fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color, height: 1.5),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),

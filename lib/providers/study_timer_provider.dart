@@ -27,6 +27,21 @@ class StudyTimerProvider extends ChangeNotifier {
   Duration get elapsed => _elapsed;
   int get lastSessionMinutes => _lastSessionMinutes;
 
+  /// Returns rounded minutes (>=30s rounds up, <30s rounds down, min 1m).
+  int get roundedMinutes {
+    if (_elapsed.inSeconds == 0) return 0;
+
+    final minutes = _elapsed.inMinutes;
+    final remainingSeconds = _elapsed.inSeconds % 60;
+
+    int result = remainingSeconds >= 30 ? minutes + 1 : minutes;
+
+    // Ensure at least 1 minute if timer was actually used
+    if (result == 0 && _elapsed.inSeconds > 0) result = 1;
+
+    return result;
+  }
+
   /// Returns elapsed minutes as an integer (for Notion field population).
   int get elapsedMinutes => _elapsed.inMinutes;
 
@@ -96,7 +111,7 @@ class StudyTimerProvider extends ChangeNotifier {
   int stop() {
     _ticker?.cancel();
 
-    final totalMinutes = _elapsed.inMinutes;
+    final totalMinutes = roundedMinutes;
 
     _startTime = null;
     _elapsed = Duration.zero;
@@ -109,6 +124,12 @@ class StudyTimerProvider extends ChangeNotifier {
     notifyListeners();
 
     return totalMinutes;
+  }
+
+  /// Captures current elapsed minutes without stopping the timer.
+  void recordSession() {
+    _lastSessionMinutes = roundedMinutes;
+    notifyListeners();
   }
 
   /// Discards the timer session without returning a value.

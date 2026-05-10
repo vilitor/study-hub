@@ -2,6 +2,11 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:study_hub/config/app_constants.dart';
+import 'package:study_hub/models/app_settings.dart';
+import 'package:study_hub/models/certificate.dart';
+import 'package:study_hub/models/cloud_sync.dart';
+import 'package:study_hub/models/local_study_field.dart';
+import 'package:study_hub/models/study_goal.dart';
 import 'package:study_hub/models/study_log.dart';
 import 'package:study_hub/models/study_event.dart';
 
@@ -19,7 +24,22 @@ class StorageService {
 
   static const String _keyStudyLogs = 'persisted_study_logs';
   static const String _keyStudyEvents = 'persisted_study_events';
+  static const String _keyStudyGoals = 'persisted_study_goals';
+  static const String _keyCertificates = 'persisted_certificates';
+  static const String _keySyncQueue = 'cloud_sync_queue';
   static const String _keyNotionSchema = 'notion_cached_schema';
+  static const String _keyNotionTimeField = 'notion_mapped_time_field';
+  static const String _keyLocalTimeField = 'local_mapped_time_field';
+  static const String _keyLocalStudyFields = 'local_study_fields';
+  static const String _keyCustomCategories = 'app_custom_categories';
+  static const String _keyDeletedDefaultCategories =
+      'app_deleted_default_categories';
+  static const String _keyNotionAuthenticated = 'app_notion_authenticated';
+  static const String _keyNotionDatabaseIdPrefs = 'app_notion_database_id';
+  static const String _keyLinkToNotion = 'app_link_categories_notion';
+  static const String _keyNotionCategoryField = 'app_notion_category_field';
+  static const String _keyGoalTutorialSeen = 'goal_tutorial_seen';
+  static const String _keyRegisterFieldSource = 'register_field_source';
 
   // ── Persistence: Logs & Events ──
 
@@ -35,10 +55,12 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final String? encodedData = prefs.getString(_keyStudyLogs);
     if (encodedData == null) return [];
-    
+
     try {
       final List<dynamic> decodedData = jsonDecode(encodedData);
-      return decodedData.map((e) => StudyLog.fromMap(e as Map<String, dynamic>)).toList();
+      return decodedData
+          .map((e) => StudyLog.fromMap(e as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -47,7 +69,9 @@ class StorageService {
   /// Persists the list of [StudyEvent] objects as a JSON string.
   Future<void> saveStudyEvents(List<StudyEvent> events) async {
     final prefs = await SharedPreferences.getInstance();
-    final String encodedData = jsonEncode(events.map((e) => e.toMap()).toList());
+    final String encodedData = jsonEncode(
+      events.map((e) => e.toMap()).toList(),
+    );
     await prefs.setString(_keyStudyEvents, encodedData);
   }
 
@@ -56,10 +80,35 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final String? encodedData = prefs.getString(_keyStudyEvents);
     if (encodedData == null) return [];
-    
+
     try {
       final List<dynamic> decodedData = jsonDecode(encodedData);
-      return decodedData.map((e) => StudyEvent.fromMap(e as Map<String, dynamic>)).toList();
+      return decodedData
+          .map((e) => StudyEvent.fromMap(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> saveStudyGoals(List<StudyGoal> goals) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _keyStudyGoals,
+      jsonEncode(goals.map((goal) => goal.toMap()).toList()),
+    );
+  }
+
+  Future<List<StudyGoal>> getStudyGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encodedData = prefs.getString(_keyStudyGoals);
+    if (encodedData == null || encodedData.isEmpty) return [];
+
+    try {
+      final decodedData = jsonDecode(encodedData) as List<dynamic>;
+      return decodedData
+          .map((goal) => StudyGoal.fromMap(Map<String, dynamic>.from(goal)))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -67,19 +116,46 @@ class StorageService {
 
   // ── Secure Storage: Tokens & Credentials ──
 
+  Future<void> saveCertificates(List<Certificate> certificates) async {
+    final prefs = await SharedPreferences.getInstance();
+    final encodedData = jsonEncode(
+      certificates.map((certificate) => certificate.toMap()).toList(),
+    );
+    await prefs.setString(_keyCertificates, encodedData);
+  }
+
+  Future<List<Certificate>> getCertificates() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encodedData = prefs.getString(_keyCertificates);
+    if (encodedData == null) return [];
+
+    try {
+      final decodedData = jsonDecode(encodedData) as List<dynamic>;
+      return decodedData
+          .map(
+            (certificate) => Certificate.fromMap(
+              Map<String, dynamic>.from(certificate as Map),
+            ),
+          )
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   /// Encrypts and saves the Notion API token.
   Future<void> saveNotionToken(String token) async {
     await _secureStorage.write(
       key: AppConstants.storageKeyNotionToken,
       value: token,
     );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyNotionAuthenticated, token.isNotEmpty);
   }
 
   /// Retrieves the encrypted Notion API token.
   Future<String?> getNotionToken() async {
-    return await _secureStorage.read(
-      key: AppConstants.storageKeyNotionToken,
-    );
+    return await _secureStorage.read(key: AppConstants.storageKeyNotionToken);
   }
 
   /// Encrypts and saves the Notion Database ID.
@@ -88,13 +164,30 @@ class StorageService {
       key: AppConstants.storageKeyNotionDatabaseId,
       value: databaseId,
     );
+    final prefs = await SharedPreferences.getInstance();
+    if (databaseId.isEmpty) {
+      await prefs.remove(_keyNotionDatabaseIdPrefs);
+    } else {
+      await prefs.setString(_keyNotionDatabaseIdPrefs, databaseId);
+    }
   }
 
   /// Retrieves the encrypted Notion Database ID.
   Future<String?> getNotionDatabaseId() async {
-    return await _secureStorage.read(
+    final secureValue = await _secureStorage.read(
       key: AppConstants.storageKeyNotionDatabaseId,
     );
+    if (secureValue != null && secureValue.isNotEmpty) {
+      return secureValue;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyNotionDatabaseIdPrefs);
+  }
+
+  Future<bool> getNotionAuthenticatedFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyNotionAuthenticated) ?? false;
   }
 
   /// Encrypts and saves the user's Google Email.
@@ -107,9 +200,7 @@ class StorageService {
 
   /// Retrieves the encrypted Google Email.
   Future<String?> getGoogleEmail() async {
-    return await _secureStorage.read(
-      key: AppConstants.storageKeyGoogleEmail,
-    );
+    return await _secureStorage.read(key: AppConstants.storageKeyGoogleEmail);
   }
 
   /// Encrypts and saves the Google User Name.
@@ -122,9 +213,7 @@ class StorageService {
 
   /// Retrieves the encrypted Google User Name.
   Future<String?> getGoogleName() async {
-    return await _secureStorage.read(
-      key: AppConstants.storageKeyGoogleName,
-    );
+    return await _secureStorage.read(key: AppConstants.storageKeyGoogleName);
   }
 
   /// Encrypts and saves the Google Photo URL.
@@ -137,9 +226,7 @@ class StorageService {
 
   /// Retrieves the encrypted Google Photo URL.
   Future<String?> getGooglePhotoUrl() async {
-    return await _secureStorage.read(
-      key: AppConstants.storageKeyGooglePhoto,
-    );
+    return await _secureStorage.read(key: AppConstants.storageKeyGooglePhoto);
   }
 
   /// Clears all entries in Secure Storage (used for full sign-out).
@@ -155,10 +242,79 @@ class StorageService {
     await prefs.setString(_keyNotionSchema, schemaJson);
   }
 
+  Future<void> clearNotionSchema() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyNotionSchema);
+  }
+
   /// Retrieves the cached Notion database schema.
   Future<String?> getNotionSchema() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyNotionSchema);
+  }
+
+  /// Saves the mapping for the study time field.
+  Future<void> saveNotionTimeField(String fieldName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyNotionTimeField, fieldName);
+  }
+
+  /// Retrieves the mapping for the study time field.
+  Future<String?> getNotionTimeField() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyNotionTimeField);
+  }
+
+  Future<void> saveLocalTimeField(String fieldName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLocalTimeField, fieldName);
+  }
+
+  Future<String?> getLocalTimeField() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLocalTimeField);
+  }
+
+  Future<void> saveRegisterFieldSource(RegisterFieldSource source) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyRegisterFieldSource, source.name);
+  }
+
+  Future<RegisterFieldSource?> getRegisterFieldSource() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_keyRegisterFieldSource);
+    if (value == null || value.isEmpty) return null;
+    return RegisterFieldSource.values.firstWhere(
+      (source) => source.name == value,
+      orElse: () => RegisterFieldSource.local,
+    );
+  }
+
+  Future<void> saveLocalStudyFields(List<LocalStudyField> fields) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _keyLocalStudyFields,
+      jsonEncode(fields.map((field) => field.toMap()).toList()),
+    );
+  }
+
+  Future<List<LocalStudyField>> getLocalStudyFields() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encodedData = prefs.getString(_keyLocalStudyFields);
+    if (encodedData == null || encodedData.isEmpty) return [];
+
+    try {
+      final decodedData = jsonDecode(encodedData) as List<dynamic>;
+      return decodedData
+          .map(
+            (field) => LocalStudyField.fromMap(
+              Map<String, dynamic>.from(field as Map),
+            ),
+          )
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   /// Updates the application theme mode preference.
@@ -170,7 +326,7 @@ class StorageService {
   /// Retrieves the application theme mode preference.
   Future<String> getThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(AppConstants.prefKeyThemeMode) ?? 'system';
+    return prefs.getString(AppConstants.prefKeyThemeMode) ?? 'light';
   }
 
   /// Updates the default reminder offset (minutes).
@@ -195,5 +351,119 @@ class StorageService {
   Future<void> setFirstLaunchDone() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(AppConstants.prefKeyIsFirstLaunch, false);
+  }
+
+  Future<bool> hasSeenGoalTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyGoalTutorialSeen) ?? false;
+  }
+
+  Future<void> setGoalTutorialSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyGoalTutorialSeen, true);
+  }
+
+  // ── Category Persistence ──
+
+  Future<void> saveCustomCategories(List<String> categories) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyCustomCategories, categories);
+  }
+
+  Future<List<String>> getCustomCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_keyCustomCategories) ?? [];
+  }
+
+  Future<void> saveDeletedDefaultCategories(List<String> categories) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyDeletedDefaultCategories, categories);
+  }
+
+  Future<List<String>> getDeletedDefaultCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_keyDeletedDefaultCategories) ?? [];
+  }
+
+  Future<void> saveLinkCategoriesToNotion(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyLinkToNotion, value);
+  }
+
+  Future<bool> getLinkCategoriesToNotion() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyLinkToNotion) ?? false;
+  }
+
+  Future<void> saveNotionCategoryField(String fieldName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyNotionCategoryField, fieldName);
+  }
+
+  Future<String?> getNotionCategoryField() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyNotionCategoryField);
+  }
+
+  Future<void> clearNotionCategoryField() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyNotionCategoryField);
+  }
+
+  // ── Cloud Sync Queue ──
+
+  Future<List<SyncQueueItem>> getSyncQueue() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encodedData = prefs.getString(_keySyncQueue);
+    if (encodedData == null || encodedData.isEmpty) return [];
+
+    try {
+      final decodedData = jsonDecode(encodedData) as List<dynamic>;
+      return decodedData
+          .map((item) => SyncQueueItem.fromMap(Map<String, dynamic>.from(item)))
+          .where(
+            (item) =>
+                item.idempotencyKey.isNotEmpty &&
+                item.collection.isNotEmpty &&
+                item.documentId.isNotEmpty,
+          )
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> saveSyncQueue(List<SyncQueueItem> queue) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _keySyncQueue,
+      jsonEncode(queue.map((item) => item.toMap()).toList()),
+    );
+  }
+
+  Future<void> enqueueSync(SyncQueueItem item) async {
+    final queue = await getSyncQueue();
+    queue.removeWhere((queued) => queued.idempotencyKey == item.idempotencyKey);
+    queue.add(item);
+    await saveSyncQueue(queue);
+  }
+
+  Future<void> removeQueuedSync(String idempotencyKey) async {
+    final queue = await getSyncQueue();
+    queue.removeWhere((item) => item.idempotencyKey == idempotencyKey);
+    await saveSyncQueue(queue);
+  }
+
+  Future<void> replaceQueuedSync(SyncQueueItem item) async {
+    final queue = await getSyncQueue();
+    final index = queue.indexWhere(
+      (queued) => queued.idempotencyKey == item.idempotencyKey,
+    );
+    if (index == -1) {
+      queue.add(item);
+    } else {
+      queue[index] = item;
+    }
+    await saveSyncQueue(queue);
   }
 }

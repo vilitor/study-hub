@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:study_hub/config/app_theme.dart';
 
-/// Botão personalizado com gradiente e animação
 class CustomButton extends StatelessWidget {
   final String label;
-  final VoidCallback? onPressed;
+  final FutureOr<void> Function()? onPressed;
   final IconData? icon;
   final bool isLoading;
   final bool isOutlined;
@@ -24,69 +25,73 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonColor = color ?? AppColors.primaryGreen;
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final resolvedColor = color ?? colors.accent;
+
+    final iconWidget = isLoading
+        ? SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: isOutlined ? resolvedColor : colors.textOnAccent,
+            ),
+          )
+        : icon != null
+        ? Icon(icon, size: 18)
+        : const SizedBox.shrink();
+
+    final labelWidget = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    final child = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null || isLoading) ...[
+          iconWidget,
+          SizedBox(width: spacing.xs),
+        ],
+        Flexible(child: labelWidget),
+      ],
+    );
 
     if (isOutlined) {
       return SizedBox(
         width: width ?? double.infinity,
-        height: 52,
-        child: OutlinedButton.icon(
-          onPressed: isLoading ? null : onPressed,
-          icon: isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : icon != null
-                  ? Icon(icon, size: 20)
-                  : const SizedBox.shrink(),
-          label: Text(label),
+        child: OutlinedButton(
+          onPressed: isLoading || onPressed == null
+              ? null
+              : () {
+                  onPressed!.call();
+                },
           style: OutlinedButton.styleFrom(
-            foregroundColor: buttonColor,
-            side: BorderSide(color: buttonColor, width: 1.5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+            foregroundColor: resolvedColor,
+            side: BorderSide(color: resolvedColor),
+            backgroundColor: colors.surface1,
           ),
+          child: child,
         ),
       );
     }
 
     return SizedBox(
       width: width ?? double.infinity,
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: isLoading ? null : onPressed,
-        icon: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : icon != null
-                ? Icon(icon, size: 20)
-                : const SizedBox.shrink(),
-        label: Text(label),
+      child: ElevatedButton(
+        onPressed: isLoading || onPressed == null
+            ? null
+            : () {
+                onPressed!.call();
+              },
         style: ElevatedButton.styleFrom(
-          backgroundColor: buttonColor,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          backgroundColor: resolvedColor,
+          foregroundColor: colors.textOnAccent,
         ),
+        child: child,
       ),
     );
   }
