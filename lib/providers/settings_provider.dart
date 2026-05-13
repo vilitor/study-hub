@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:study_hub/models/app_settings.dart';
 import 'package:study_hub/services/storage_service.dart';
 import 'package:study_hub/repositories/auth_repository.dart';
+import 'package:study_hub/services/cloud_sync_service.dart';
 import 'package:study_hub/services/local_study_schema_service.dart';
 
 /// Provider that manages global application settings and integration states.
@@ -9,6 +12,7 @@ import 'package:study_hub/services/local_study_schema_service.dart';
 class SettingsProvider extends ChangeNotifier {
   final StorageService _storage = StorageService();
   final AuthRepository _authRepository = AuthRepository();
+  final CloudSyncService _cloudSync = CloudSyncService.instance;
 
   AppSettings _settings = const AppSettings();
   bool _isLoading = true;
@@ -109,6 +113,7 @@ class SettingsProvider extends ChangeNotifier {
       clearNotionCategoryField: previousDatabaseId != databaseId,
       registerFieldSource: previousSource ?? RegisterFieldSource.notion,
     );
+    await _queueSettingsSync();
     notifyListeners();
   }
 
@@ -135,6 +140,7 @@ class SettingsProvider extends ChangeNotifier {
       clearNotionDatabaseId: true,
       clearNotionCategoryField: true,
     );
+    await _queueSettingsSync();
     notifyListeners();
   }
 
@@ -180,6 +186,7 @@ class SettingsProvider extends ChangeNotifier {
       userName: name,
       userPhotoUrl: photoUrl,
     );
+    await _queueSettingsSync();
     notifyListeners();
   }
 
@@ -199,6 +206,7 @@ class SettingsProvider extends ChangeNotifier {
         userName: null,
         userPhotoUrl: null,
       );
+      await _queueSettingsSync();
     } catch (e) {
       debugPrint('Logout error: $e');
     } finally {
@@ -211,6 +219,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setDefaultReminder(int minutes) async {
     await _storage.saveDefaultReminder(minutes);
     _settings = _settings.copyWith(defaultReminderMinutes: minutes);
+    await _queueSettingsSync();
     notifyListeners();
   }
 
@@ -219,24 +228,28 @@ class SettingsProvider extends ChangeNotifier {
     _settings = _settings.copyWith(themeMode: mode);
     notifyListeners();
     await _storage.saveThemeMode(mode);
+    await _queueSettingsSync();
   }
 
   /// Saves the mapping for the study time field.
   Future<void> setNotionTimeField(String fieldName) async {
     await _storage.saveNotionTimeField(fieldName);
     _settings = _settings.copyWith(notionTimeField: fieldName);
+    await _queueSettingsSync();
     notifyListeners();
   }
 
   Future<void> setLocalTimeField(String fieldName) async {
     await _storage.saveLocalTimeField(fieldName);
     _settings = _settings.copyWith(localTimeField: fieldName);
+    await _queueSettingsSync();
     notifyListeners();
   }
 
   Future<void> setRegisterFieldSource(RegisterFieldSource source) async {
     await _storage.saveRegisterFieldSource(source);
     _settings = _settings.copyWith(registerFieldSource: source);
+    await _queueSettingsSync();
     notifyListeners();
   }
 
@@ -245,6 +258,9 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setCustomCategories(List<String> categories) async {
     await _storage.saveCustomCategories(categories);
     _settings = _settings.copyWith(customCategories: categories);
+    await _cloudSync.enqueueLocalConfig();
+    await _queueSettingsSync(flush: false);
+    unawaited(_cloudSync.flushQueue());
     notifyListeners();
   }
 
@@ -278,6 +294,9 @@ class SettingsProvider extends ChangeNotifier {
       )..add(category);
       await _storage.saveDeletedDefaultCategories(deletedDefaults);
       _settings = _settings.copyWith(deletedDefaultCategories: deletedDefaults);
+      await _cloudSync.enqueueLocalConfig();
+      await _queueSettingsSync(flush: false);
+      unawaited(_cloudSync.flushQueue());
       notifyListeners();
     }
   }
@@ -285,12 +304,18 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setLinkCategoriesToNotion(bool value) async {
     await _storage.saveLinkCategoriesToNotion(value);
     _settings = _settings.copyWith(linkCategoriesToNotion: value);
+    await _cloudSync.enqueueLocalConfig();
+    await _queueSettingsSync(flush: false);
+    unawaited(_cloudSync.flushQueue());
     notifyListeners();
   }
 
   Future<void> setNotionCategoryField(String fieldName) async {
     await _storage.saveNotionCategoryField(fieldName);
     _settings = _settings.copyWith(notionCategoryField: fieldName);
+    await _cloudSync.enqueueLocalConfig();
+    await _queueSettingsSync(flush: false);
+    unawaited(_cloudSync.flushQueue());
     notifyListeners();
   }
 
@@ -299,5 +324,10 @@ class SettingsProvider extends ChangeNotifier {
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
+  }
+
+  Future<void> _queueSettingsSync({bool flush = true}) async {
+    await _cloudSync.enqueueSettings(await _storage.getCloudSettingsSnapshot());
+    if (flush) unawaited(_cloudSync.flushQueue());
   }
 }

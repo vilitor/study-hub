@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:study_hub/services/cloud_sync_service.dart';
+import 'package:study_hub/services/storage_service.dart';
 
 /// Provider that manages a single study timer session.
 /// Persists start timestamp for crash recovery.
 class StudyTimerProvider extends ChangeNotifier {
+  final StorageService _storage = StorageService();
+  final CloudSyncService _cloudSync = CloudSyncService.instance;
   // ── State ──
   Timer? _ticker;
   DateTime? _startTime;
@@ -121,6 +125,9 @@ class StudyTimerProvider extends ChangeNotifier {
     _lastSessionMinutes = totalMinutes;
 
     _clearPersistence();
+    if (totalMinutes > 0) {
+      unawaited(_persistTimerStats(totalMinutes));
+    }
     notifyListeners();
 
     return totalMinutes;
@@ -129,6 +136,9 @@ class StudyTimerProvider extends ChangeNotifier {
   /// Captures current elapsed minutes without stopping the timer.
   void recordSession() {
     _lastSessionMinutes = roundedMinutes;
+    if (_lastSessionMinutes > 0) {
+      unawaited(_persistTimerStats(_lastSessionMinutes, countSession: false));
+    }
     notifyListeners();
   }
 
@@ -174,6 +184,24 @@ class StudyTimerProvider extends ChangeNotifier {
     await prefs.remove(_keyIsPaused);
     await prefs.remove(_keyPausedElapsed);
     await prefs.remove(_keyStartTime);
+  }
+
+  Future<void> _persistTimerStats(
+    int minutes, {
+    bool countSession = true,
+  }) async {
+    final current = await _storage.getTimerStatsSnapshot();
+    final total = (current['totalRecordedMinutes'] as num?)?.toInt() ?? 0;
+    final count = (current['sessionCount'] as num?)?.toInt() ?? 0;
+    await _storage.saveTimerStatsSnapshot({
+      ...current,
+      'lastSessionMinutes': minutes,
+      'totalRecordedMinutes': countSession ? total + minutes : total,
+      'sessionCount': countSession ? count + 1 : count,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+    await _cloudSync.enqueueLocalConfig();
+    unawaited(_cloudSync.flushQueue());
   }
 
   /// Recovers an in-progress timer session after app restart.

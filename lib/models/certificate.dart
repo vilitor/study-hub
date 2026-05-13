@@ -28,6 +28,8 @@ class CertificateAttachment {
   final CertificateFileType fileType;
   final int fileSizeBytes;
   final DateTime addedAt;
+  final String? remotePath;
+  final DateTime? remoteUploadedAt;
 
   CertificateAttachment({
     String? id,
@@ -37,8 +39,32 @@ class CertificateAttachment {
     required this.fileType,
     required this.fileSizeBytes,
     DateTime? addedAt,
+    this.remotePath,
+    this.remoteUploadedAt,
   }) : id = id ?? const Uuid().v4(),
        addedAt = addedAt ?? DateTime.now();
+
+  CertificateAttachment copyWith({
+    String? localPath,
+    String? remotePath,
+    DateTime? remoteUploadedAt,
+    bool clearRemotePath = false,
+    bool clearRemoteUploadedAt = false,
+  }) {
+    return CertificateAttachment(
+      id: id,
+      originalName: originalName,
+      localPath: localPath ?? this.localPath,
+      mimeType: mimeType,
+      fileType: fileType,
+      fileSizeBytes: fileSizeBytes,
+      addedAt: addedAt,
+      remotePath: clearRemotePath ? null : remotePath ?? this.remotePath,
+      remoteUploadedAt: clearRemoteUploadedAt
+          ? null
+          : remoteUploadedAt ?? this.remoteUploadedAt,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -49,6 +75,8 @@ class CertificateAttachment {
       'fileType': fileType.name,
       'fileSizeBytes': fileSizeBytes,
       'addedAt': addedAt.toIso8601String(),
+      'remotePath': remotePath,
+      'remoteUploadedAt': remoteUploadedAt?.toIso8601String(),
     };
   }
 
@@ -65,6 +93,10 @@ class CertificateAttachment {
       fileSizeBytes: (map['fileSizeBytes'] as num?)?.toInt() ?? 0,
       addedAt:
           DateTime.tryParse(map['addedAt']?.toString() ?? '') ?? DateTime.now(),
+      remotePath: map['remotePath']?.toString(),
+      remoteUploadedAt: DateTime.tryParse(
+        map['remoteUploadedAt']?.toString() ?? '',
+      ),
     );
   }
 }

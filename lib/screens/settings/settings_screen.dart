@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:study_hub/config/app_routes.dart';
 import 'package:study_hub/config/app_theme.dart';
 import 'package:study_hub/models/auth_session.dart';
+import 'package:study_hub/models/cloud_sync.dart';
 import 'package:study_hub/providers/auth_session_provider.dart';
 import 'package:study_hub/providers/settings_provider.dart';
 import 'package:study_hub/screens/settings/privacy_policy_screen.dart';
 import 'package:study_hub/services/app_haptics.dart';
+import 'package:study_hub/services/cloud_sync_service.dart';
 import 'package:study_hub/utils/snackbar_helper.dart';
 import 'package:study_hub/widgets/app_modal.dart';
 import 'package:study_hub/widgets/app_surface.dart';
@@ -38,6 +40,13 @@ class SettingsScreen extends StatelessWidget {
             auth = context.watch<AuthSessionProvider>();
           } on ProviderNotFoundException {
             auth = null;
+          }
+
+          CloudSyncState syncState = const CloudSyncState();
+          try {
+            syncState = context.watch<CloudSyncService>().state;
+          } on ProviderNotFoundException {
+            syncState = const CloudSyncState();
           }
 
           final googleConnected =
@@ -75,6 +84,10 @@ class SettingsScreen extends StatelessWidget {
                   accentColor: const Color(0xFF4285F4),
                   onTap: () => _handleGoogle(context, settings, auth),
                 ),
+                if (googleConnected) ...[
+                  SizedBox(height: spacing.sm),
+                  _CloudSyncStatusTile(syncState: syncState),
+                ],
                 SizedBox(height: spacing.sm),
                 IntegrationButton(
                   mark: const NotionBrandMark(),
@@ -272,7 +285,7 @@ class SettingsScreen extends StatelessWidget {
                 onPressed: () async {
                   await AppHaptics.warning();
                   if (auth != null) {
-                    await auth.signOut();
+                    await auth.signOut(keepGuestMode: false);
                   }
                   await settings.disconnectGoogle();
                   if (!sheetContext.mounted) return;
@@ -287,5 +300,71 @@ class SettingsScreen extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _CloudSyncStatusTile extends StatelessWidget {
+  final CloudSyncState syncState;
+
+  const _CloudSyncStatusTile({required this.syncState});
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = switch (syncState.phase) {
+      CloudSyncPhase.syncing => 'Sincronizando backup Firebase...',
+      CloudSyncPhase.offline =>
+        'Modo offline ativo. ${syncState.pendingCount} alteracao(oes) pendente(s).',
+      CloudSyncPhase.timeout =>
+        'Sync demorou demais. O app continua funcionando localmente.',
+      CloudSyncPhase.error =>
+        'Falha no sync. ${syncState.pendingCount} item(ns) pendente(s).',
+      CloudSyncPhase.pending =>
+        '${syncState.pendingCount} alteracao(oes) aguardando envio.',
+      _ when syncState.pendingCount > 0 =>
+        '${syncState.pendingCount} item(ns) aguardando conexao.',
+      _ when syncState.lastSyncedAt != null =>
+        'Ultimo backup: ${_formatLastSync(syncState.lastSyncedAt!)}',
+      _ => 'Backup Firebase pronto para restaurar seus dados.',
+    };
+
+    final icon = switch (syncState.phase) {
+      CloudSyncPhase.syncing => Icons.sync_rounded,
+      CloudSyncPhase.offline => Icons.wifi_off_rounded,
+      CloudSyncPhase.timeout => Icons.schedule_rounded,
+      CloudSyncPhase.error => Icons.cloud_off_rounded,
+      CloudSyncPhase.pending => Icons.cloud_queue_rounded,
+      _ when syncState.pendingCount > 0 => Icons.cloud_queue_rounded,
+      _ => Icons.cloud_done_rounded,
+    };
+
+    return AppSurface.subtle(
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon, color: context.colors.accent),
+        title: const Text('Backup na nuvem'),
+        subtitle: Text(subtitle),
+        trailing: syncState.phase == CloudSyncPhase.syncing
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: context.colors.accent,
+                ),
+              )
+            : IconButton(
+                tooltip: 'Sincronizar agora',
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: () => CloudSyncService.instance.synchronize(),
+              ),
+      ),
+    );
+  }
+
+  String _formatLastSync(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.day}/${local.month}/${local.year} $hour:$minute';
   }
 }

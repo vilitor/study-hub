@@ -37,11 +37,7 @@ class StudyRepository {
     currentLogs.removeWhere((l) => l.id == logId);
     await _storageService.saveStudyLogs(currentLogs);
     await _cloudSyncService.enqueueDelete(
-      collection: CloudCollections.records,
-      documentId: logId,
-    );
-    await _cloudSyncService.enqueueDelete(
-      collection: CloudCollections.notes,
+      collection: CloudCollections.studyLogs,
       documentId: logId,
     );
     unawaited(_cloudSyncService.flushQueue());
@@ -115,7 +111,7 @@ class StudyRepository {
     if (currentEvents.length < countBefore) {
       await _storageService.saveStudyEvents(currentEvents);
       await _cloudSyncService.enqueueDelete(
-        collection: CloudCollections.records,
+        collection: CloudCollections.studyEvents,
         documentId: event.id,
       );
       unawaited(_cloudSyncService.flushQueue());

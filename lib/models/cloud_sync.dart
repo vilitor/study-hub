@@ -2,6 +2,80 @@ enum CloudSyncStatus { localOnly, pendingSync, synced, syncError }
 
 enum SyncQueueOperation { upsert, delete }
 
+enum CloudSyncPhase {
+  idle,
+  syncing,
+  pending,
+  restored,
+  offline,
+  timeout,
+  error,
+}
+
+class CloudSyncState {
+  final CloudSyncPhase phase;
+  final int pendingCount;
+  final DateTime? lastSyncedAt;
+  final DateTime? lastRestoreAt;
+  final DateTime? lastAttemptAt;
+  final String? lastError;
+
+  const CloudSyncState({
+    this.phase = CloudSyncPhase.idle,
+    this.pendingCount = 0,
+    this.lastSyncedAt,
+    this.lastRestoreAt,
+    this.lastAttemptAt,
+    this.lastError,
+  });
+
+  bool get isSyncing => phase == CloudSyncPhase.syncing;
+
+  CloudSyncState copyWith({
+    CloudSyncPhase? phase,
+    int? pendingCount,
+    DateTime? lastSyncedAt,
+    DateTime? lastRestoreAt,
+    DateTime? lastAttemptAt,
+    String? lastError,
+    bool clearError = false,
+  }) {
+    return CloudSyncState(
+      phase: phase ?? this.phase,
+      pendingCount: pendingCount ?? this.pendingCount,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      lastRestoreAt: lastRestoreAt ?? this.lastRestoreAt,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      lastError: clearError ? null : lastError ?? this.lastError,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'phase': phase.name,
+      'pendingCount': pendingCount,
+      'lastSyncedAt': lastSyncedAt?.toIso8601String(),
+      'lastRestoreAt': lastRestoreAt?.toIso8601String(),
+      'lastAttemptAt': lastAttemptAt?.toIso8601String(),
+      'lastError': lastError,
+    };
+  }
+
+  factory CloudSyncState.fromMap(Map<String, dynamic> map) {
+    return CloudSyncState(
+      phase: CloudSyncPhase.values.firstWhere(
+        (phase) => phase.name == map['phase'],
+        orElse: () => CloudSyncPhase.idle,
+      ),
+      pendingCount: (map['pendingCount'] as num?)?.toInt() ?? 0,
+      lastSyncedAt: DateTime.tryParse(map['lastSyncedAt']?.toString() ?? ''),
+      lastRestoreAt: DateTime.tryParse(map['lastRestoreAt']?.toString() ?? ''),
+      lastAttemptAt: DateTime.tryParse(map['lastAttemptAt']?.toString() ?? ''),
+      lastError: map['lastError']?.toString(),
+    );
+  }
+}
+
 class SyncQueueItem {
   final String idempotencyKey;
   final String collection;

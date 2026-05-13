@@ -41,6 +41,8 @@ class GoalProvider extends ChangeNotifier {
     _loadGoals();
   }
 
+  Future<void> reloadGoals() => _loadGoals();
+
   // ── Progress Calculation ──
 
   /// Calculates progress (0.0 to 1.0) for a goal based on study logs.

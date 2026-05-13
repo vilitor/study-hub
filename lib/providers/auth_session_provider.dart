@@ -46,6 +46,7 @@ class AuthSessionProvider extends ChangeNotifier {
   bool get isSignedIn => _status == AuthSessionStatus.signedIn;
 
   Future<void> loadSession() async {
+    debugPrint('[AuthSessionProvider] loadSession start');
     _isLoading = true;
     notifyListeners();
     try {
@@ -60,21 +61,26 @@ class AuthSessionProvider extends ChangeNotifier {
         _applyFirebaseUser(user);
         _status = AuthSessionStatus.signedIn;
         _hasEntryChoice = true;
+        debugPrint('[AuthSessionProvider] Firebase user restored: ${user.uid}');
       } else if (entryChoice == _entryGuest) {
         _status = AuthSessionStatus.guest;
         _clearUser();
+        debugPrint('[AuthSessionProvider] Guest session restored');
       } else {
         _status = AuthSessionStatus.signedOut;
         _clearUser();
+        debugPrint('[AuthSessionProvider] No local auth session');
       }
       _pendingSyncCount = await _cloudSync.pendingCount();
     } finally {
       _isLoading = false;
+      debugPrint('[AuthSessionProvider] loadSession complete: ${_status.name}');
       notifyListeners();
     }
   }
 
   Future<void> continueAsGuest() async {
+    debugPrint('[AuthSessionProvider] continueAsGuest');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_entryChoiceKey, _entryGuest);
     _hasEntryChoice = true;
@@ -85,6 +91,7 @@ class AuthSessionProvider extends ChangeNotifier {
   }
 
   Future<bool> signInWithGoogle() async {
+    debugPrint('[AuthSessionProvider] signInWithGoogle start');
     _status = AuthSessionStatus.signingIn;
     _lastDiagnostic = null;
     notifyListeners();
@@ -93,6 +100,10 @@ class AuthSessionProvider extends ChangeNotifier {
     if (!result.isSuccess || result.googleAccount == null) {
       _lastDiagnostic = result.diagnostic;
       _status = AuthSessionStatus.authError;
+      debugPrint(
+        '[AuthSessionProvider] signInWithGoogle failed: '
+        '${result.diagnostic?.reason.name}',
+      );
       notifyListeners();
       return false;
     }
@@ -113,13 +124,14 @@ class AuthSessionProvider extends ChangeNotifier {
     await _storage.saveGooglePhotoUrl(_photoUrl ?? '');
     notifyListeners();
 
-    await _cloudSync.restoreAndMergeLocalData();
     _pendingSyncCount = await _cloudSync.pendingCount();
+    debugPrint('[AuthSessionProvider] signInWithGoogle success: $_uid');
     notifyListeners();
     return true;
   }
 
   Future<void> signOut({bool keepGuestMode = true}) async {
+    debugPrint('[AuthSessionProvider] signOut keepGuestMode=$keepGuestMode');
     await _authRepository.logout();
     await _storage.saveGoogleEmail('');
     await _storage.saveGoogleName('');

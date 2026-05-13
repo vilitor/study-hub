@@ -39,6 +39,45 @@ class AppSettings {
     this.registerFieldSource = RegisterFieldSource.local,
   });
 
+  Map<String, dynamic> toCloudMap() {
+    return {
+      'notionDatabaseId': notionDatabaseId,
+      'themeMode': themeMode,
+      'defaultReminderMinutes': defaultReminderMinutes,
+      'notionTimeField': notionTimeField,
+      'localTimeField': localTimeField,
+      'customCategories': customCategories,
+      'deletedDefaultCategories': deletedDefaultCategories,
+      'linkCategoriesToNotion': linkCategoriesToNotion,
+      'notionCategoryField': notionCategoryField,
+      'registerFieldSource': registerFieldSource.name,
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  factory AppSettings.fromCloudMap(Map<String, dynamic> map) {
+    return AppSettings(
+      notionDatabaseId: map['notionDatabaseId']?.toString(),
+      themeMode: map['themeMode']?.toString() ?? 'light',
+      defaultReminderMinutes:
+          (map['defaultReminderMinutes'] as num?)?.toInt() ?? 15,
+      notionTimeField: map['notionTimeField']?.toString(),
+      localTimeField: map['localTimeField']?.toString(),
+      customCategories: List<String>.from(
+        map['customCategories'] as List? ?? const [],
+      ),
+      deletedDefaultCategories: List<String>.from(
+        map['deletedDefaultCategories'] as List? ?? const [],
+      ),
+      linkCategoriesToNotion: map['linkCategoriesToNotion'] as bool? ?? false,
+      notionCategoryField: map['notionCategoryField']?.toString(),
+      registerFieldSource: RegisterFieldSource.values.firstWhere(
+        (source) => source.name == map['registerFieldSource'],
+        orElse: () => RegisterFieldSource.local,
+      ),
+    );
+  }
+
   /// Cria uma cópia com campos alterados
   AppSettings copyWith({
     bool? isGoogleConnected,

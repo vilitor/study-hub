@@ -27,6 +27,7 @@ class StorageService {
   static const String _keyStudyGoals = 'persisted_study_goals';
   static const String _keyCertificates = 'persisted_certificates';
   static const String _keySyncQueue = 'cloud_sync_queue';
+  static const String _keyCloudSyncState = 'cloud_sync_state';
   static const String _keyNotionSchema = 'notion_cached_schema';
   static const String _keyNotionTimeField = 'notion_mapped_time_field';
   static const String _keyLocalTimeField = 'local_mapped_time_field';
@@ -40,6 +41,7 @@ class StorageService {
   static const String _keyNotionCategoryField = 'app_notion_category_field';
   static const String _keyGoalTutorialSeen = 'goal_tutorial_seen';
   static const String _keyRegisterFieldSource = 'register_field_source';
+  static const String _keyTimerStats = 'timer_stats';
 
   // ── Persistence: Logs & Events ──
 
@@ -465,5 +467,169 @@ class StorageService {
       queue[index] = item;
     }
     await saveSyncQueue(queue);
+  }
+
+  Future<CloudSyncState> getCloudSyncState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = prefs.getString(_keyCloudSyncState);
+    if (encoded == null || encoded.isEmpty) return const CloudSyncState();
+
+    try {
+      return CloudSyncState.fromMap(
+        Map<String, dynamic>.from(jsonDecode(encoded) as Map),
+      );
+    } catch (_) {
+      return const CloudSyncState();
+    }
+  }
+
+  Future<void> saveCloudSyncState(CloudSyncState state) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyCloudSyncState, jsonEncode(state.toMap()));
+  }
+
+  Future<Map<String, dynamic>> getCloudSettingsSnapshot() async {
+    final prefs = await SharedPreferences.getInstance();
+    final source = await getRegisterFieldSource();
+    return {
+      'themeMode': await getThemeMode(),
+      'defaultReminderMinutes': await getDefaultReminder(),
+      'notionDatabaseId': await getNotionDatabaseId(),
+      'notionTimeField': await getNotionTimeField(),
+      'localTimeField': await getLocalTimeField(),
+      'customCategories': await getCustomCategories(),
+      'deletedDefaultCategories': await getDeletedDefaultCategories(),
+      'linkCategoriesToNotion': await getLinkCategoriesToNotion(),
+      'notionCategoryField': await getNotionCategoryField(),
+      'registerFieldSource': source?.name ?? RegisterFieldSource.local.name,
+      'goalTutorialSeen': prefs.getBool(_keyGoalTutorialSeen) ?? false,
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Future<void> applyCloudSettingsSnapshot(Map<String, dynamic> map) async {
+    final themeMode = map['themeMode']?.toString();
+    if (themeMode == 'light' || themeMode == 'dark') {
+      await saveThemeMode(themeMode!);
+    }
+
+    final reminder = (map['defaultReminderMinutes'] as num?)?.toInt();
+    if (reminder != null) await saveDefaultReminder(reminder);
+
+    final notionDatabaseId = map['notionDatabaseId']?.toString();
+    if (notionDatabaseId != null) {
+      await saveNotionDatabaseId(notionDatabaseId);
+    }
+
+    final notionTimeField = map['notionTimeField']?.toString();
+    if (notionTimeField != null) await saveNotionTimeField(notionTimeField);
+
+    final localTimeField = map['localTimeField']?.toString();
+    if (localTimeField != null) await saveLocalTimeField(localTimeField);
+
+    await saveCustomCategories(
+      List<String>.from(map['customCategories'] as List? ?? const []),
+    );
+    await saveDeletedDefaultCategories(
+      List<String>.from(map['deletedDefaultCategories'] as List? ?? const []),
+    );
+    await saveLinkCategoriesToNotion(
+      map['linkCategoriesToNotion'] as bool? ?? false,
+    );
+
+    final notionCategoryField = map['notionCategoryField']?.toString();
+    if (notionCategoryField == null || notionCategoryField.isEmpty) {
+      await clearNotionCategoryField();
+    } else {
+      await saveNotionCategoryField(notionCategoryField);
+    }
+
+    final sourceName = map['registerFieldSource']?.toString();
+    final source = RegisterFieldSource.values.firstWhere(
+      (source) => source.name == sourceName,
+      orElse: () => RegisterFieldSource.local,
+    );
+    await saveRegisterFieldSource(source);
+
+    if (map['goalTutorialSeen'] is bool) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(
+        _keyGoalTutorialSeen,
+        map['goalTutorialSeen'] as bool,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> getLocalConfigSnapshot() async {
+    return {
+      'studySchema': (await getLocalStudyFields())
+          .map((field) => field.toMap())
+          .toList(),
+      'categories': {
+        'custom': await getCustomCategories(),
+        'deletedDefault': await getDeletedDefaultCategories(),
+        'linkToNotion': await getLinkCategoriesToNotion(),
+        'notionCategoryField': await getNotionCategoryField(),
+      },
+      'timerStats': await getTimerStatsSnapshot(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Future<void> applyLocalConfigSnapshot(Map<String, dynamic> map) async {
+    final schema = map['studySchema'];
+    if (schema is List) {
+      await saveLocalStudyFields(
+        schema
+            .map(
+              (field) => LocalStudyField.fromMap(
+                Map<String, dynamic>.from(field as Map),
+              ),
+            )
+            .toList(),
+      );
+    }
+
+    final categories = map['categories'];
+    if (categories is Map) {
+      final categoryMap = Map<String, dynamic>.from(categories);
+      await saveCustomCategories(
+        List<String>.from(categoryMap['custom'] as List? ?? const []),
+      );
+      await saveDeletedDefaultCategories(
+        List<String>.from(categoryMap['deletedDefault'] as List? ?? const []),
+      );
+      await saveLinkCategoriesToNotion(
+        categoryMap['linkToNotion'] as bool? ?? false,
+      );
+      final notionCategoryField = categoryMap['notionCategoryField']
+          ?.toString();
+      if (notionCategoryField == null || notionCategoryField.isEmpty) {
+        await clearNotionCategoryField();
+      } else {
+        await saveNotionCategoryField(notionCategoryField);
+      }
+    }
+
+    final timerStats = map['timerStats'];
+    if (timerStats is Map) {
+      await saveTimerStatsSnapshot(Map<String, dynamic>.from(timerStats));
+    }
+  }
+
+  Future<Map<String, dynamic>> getTimerStatsSnapshot() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = prefs.getString(_keyTimerStats);
+    if (encoded == null || encoded.isEmpty) return const {};
+    try {
+      return Map<String, dynamic>.from(jsonDecode(encoded) as Map);
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> saveTimerStatsSnapshot(Map<String, dynamic> map) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyTimerStats, jsonEncode(map));
   }
 }

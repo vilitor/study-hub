@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -16,6 +17,8 @@ import 'package:study_hub/providers/settings_provider.dart';
 import 'package:study_hub/providers/study_timer_provider.dart';
 import 'package:study_hub/providers/goal_provider.dart';
 import 'package:study_hub/services/app_haptics.dart';
+import 'package:study_hub/services/cloud_sync_service.dart';
+import 'package:study_hub/services/sync_coordinator.dart';
 import 'package:study_hub/screens/home/home_screen.dart';
 import 'package:study_hub/screens/achievements/achievements_screen.dart';
 import 'package:study_hub/screens/create_event/create_event_screen.dart';
@@ -23,7 +26,7 @@ import 'package:study_hub/screens/study_log/study_log_screen.dart';
 import 'package:study_hub/screens/settings/settings_screen.dart';
 import 'package:study_hub/screens/history/registration_history_screen.dart';
 import 'package:study_hub/screens/performance/performance_screen.dart';
-import 'package:study_hub/screens/splash/app_splash_screen.dart';
+import 'package:study_hub/screens/splash/startup_gate.dart';
 import 'package:study_hub/widgets/floating_nav_bar.dart';
 import 'package:study_hub/widgets/floating_timer_bar.dart';
 
@@ -35,6 +38,9 @@ void main() async {
   // Inicializa dados de localização (para datas em português)
   await initializeDateFormatting('pt_BR', null);
   await Firebase.initializeApp();
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+  );
 
   // Define a barra de status como transparente
   SystemChrome.setSystemUIOverlayStyle(
@@ -68,33 +74,37 @@ class StudyHubApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CertificateProvider()),
         ChangeNotifierProvider(create: (_) => LocalStudySchemaProvider()),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
+        ChangeNotifierProvider.value(value: CloudSyncService.instance),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
-          return MaterialApp(
-            title: 'StudyHub',
-            debugShowCheckedModeBanner: false,
+          return SyncCoordinator(
+            child: MaterialApp(
+              title: 'StudyHub',
+              debugShowCheckedModeBanner: false,
 
-            // Tema visual do app
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: settings.themeMode == 'dark'
-                ? ThemeMode.dark
-                : settings.themeMode == 'light'
-                ? ThemeMode.light
-                : ThemeMode.light,
+              // Tema visual do app
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: settings.themeMode == 'dark'
+                  ? ThemeMode.dark
+                  : settings.themeMode == 'light'
+                  ? ThemeMode.light
+                  : ThemeMode.light,
 
-            // Tela inicial com navegação por abas
-            home: const AppSplashScreen(destination: MainNavigationScreen()),
+              // Tela inicial com navegação por abas
+              home: const StartupGate(destination: MainNavigationScreen()),
 
-            // Rotas nomeadas para navegação entre telas
-            routes: {
-              AppRoutes.createEvent: (context) => const CreateEventScreen(),
-              AppRoutes.studyLog: (context) => const StudyLogScreen(),
-              AppRoutes.settings: (context) => const SettingsScreen(),
-              AppRoutes.history: (context) => const RegistrationHistoryScreen(),
-              AppRoutes.achievements: (context) => const AchievementsScreen(),
-            },
+              // Rotas nomeadas para navegação entre telas
+              routes: {
+                AppRoutes.createEvent: (context) => const CreateEventScreen(),
+                AppRoutes.studyLog: (context) => const StudyLogScreen(),
+                AppRoutes.settings: (context) => const SettingsScreen(),
+                AppRoutes.history: (context) =>
+                    const RegistrationHistoryScreen(),
+                AppRoutes.achievements: (context) => const AchievementsScreen(),
+              },
+            ),
           );
         },
       ),

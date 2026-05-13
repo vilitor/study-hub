@@ -45,6 +45,27 @@ class CertificateFileService {
     }
   }
 
+  Future<bool> attachmentFileExists(CertificateAttachment attachment) async {
+    if (attachment.localPath.isEmpty) return false;
+    return File(attachment.localPath).exists();
+  }
+
+  Future<File> createRestoredAttachmentFile(
+    CertificateAttachment attachment,
+  ) async {
+    final directory = await _certificateDirectory();
+    final extension = p.extension(attachment.originalName).isNotEmpty
+        ? p.extension(attachment.originalName)
+        : _extensionForMimeType(attachment.mimeType);
+    final destination = File(
+      p.join(directory.path, '${attachment.id}$extension'),
+    );
+    if (!await destination.parent.exists()) {
+      await destination.parent.create(recursive: true);
+    }
+    return destination;
+  }
+
   Future<Directory> _certificateDirectory() async {
     final base = await getApplicationDocumentsDirectory();
     final directory = Directory(p.join(base.path, 'certificates'));
@@ -70,6 +91,16 @@ class CertificateFileService {
       '.jpg' || '.jpeg' => 'image/jpeg',
       '.webp' => 'image/webp',
       _ => 'application/octet-stream',
+    };
+  }
+
+  String _extensionForMimeType(String mimeType) {
+    return switch (mimeType.toLowerCase()) {
+      'application/pdf' => '.pdf',
+      'image/png' => '.png',
+      'image/jpeg' => '.jpg',
+      'image/webp' => '.webp',
+      _ => '',
     };
   }
 }

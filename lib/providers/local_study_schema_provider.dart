@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:study_hub/models/local_study_field.dart';
+import 'package:study_hub/services/cloud_sync_service.dart';
 import 'package:study_hub/services/local_study_schema_service.dart';
 import 'package:study_hub/services/storage_service.dart';
 
 class LocalStudySchemaProvider extends ChangeNotifier {
   final StorageService _storage = StorageService();
+  final CloudSyncService _cloudSync = CloudSyncService.instance;
   final List<LocalStudyField> _fields = [];
   bool _isLoading = false;
   String? _lastError;
@@ -101,6 +105,8 @@ class LocalStudySchemaProvider extends ChangeNotifier {
     try {
       _lastError = null;
       await _storage.saveLocalStudyFields(_fields);
+      await _cloudSync.enqueueLocalConfig();
+      unawaited(_cloudSync.flushQueue());
       notifyListeners();
       return true;
     } catch (e) {
