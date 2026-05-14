@@ -9,6 +9,7 @@ import 'package:study_hub/models/app_settings.dart';
 import 'package:study_hub/models/local_study_field.dart';
 import 'package:study_hub/models/notion_schema.dart';
 import 'package:study_hub/models/study_log.dart';
+import 'package:study_hub/providers/auth_session_provider.dart';
 import 'package:study_hub/providers/certificate_provider.dart';
 import 'package:study_hub/providers/goal_provider.dart';
 import 'package:study_hub/providers/local_study_schema_provider.dart';
@@ -338,6 +339,60 @@ void main() {
 
     expect(find.text('Campos do Notion'), findsOneWidget);
     expect(find.byType(DynamicFormBuilder), findsNWidgets(3));
+    expect(find.byTooltip('Notas de estudo'), findsOneWidget);
+  });
+
+  testWidgets('Register stores notes while using Notion Sync source', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'app_notion_authenticated': true,
+      'app_notion_database_id': 'db-123',
+      'notion_cached_schema':
+          '{"properties":{"Titulo":{"id":"title","type":"title"},"Tempo":{"id":"time","type":"number"}}}',
+      'register_field_source': RegisterFieldSource.notion.name,
+    });
+    secureValues['notion_token'] = 'secret-token';
+    secureValues['notion_database_id'] = 'db-123';
+    final settings = SettingsProvider();
+    final logs = StudyLogProvider();
+    await settings.loadSettings();
+    await logs.loadSchemaFromCache();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => LocalStudySchemaProvider()),
+          ChangeNotifierProvider.value(value: logs),
+          ChangeNotifierProvider(create: (_) => StudyTimerProvider()),
+          ChangeNotifierProvider.value(value: settings),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          routes: {'/history': (_) => const Scaffold(body: Text('History'))},
+          home: const StudyLogScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    secureValues.remove('notion_token');
+
+    await tester.tap(find.byTooltip('Notas de estudo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Notas de estudo'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField).last, 'Resumo Notion');
+    await tester.tap(find.text('Concluir'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Salvar registro'));
+    await tester.tap(find.text('Salvar registro'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(logs.logs, hasLength(1));
+    expect(logs.logs.single.source, StudyLogSource.notion);
+    expect(logs.logs.single.localNote?.summary, 'Resumo Notion');
   });
 
   testWidgets('Notion select field updates selected value immediately', (
@@ -551,6 +606,98 @@ void main() {
     );
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.textContaining('link(s) confiaveis'), findsNothing);
+  });
+
+  testWidgets('Home avatar prefers reactive auth photo over stored settings', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsProvider();
+    await settings.syncGoogleProfileFromAuth(
+      email: 'old@example.com',
+      name: 'Old User',
+      photoUrl: 'https://example.com/old-avatar.png',
+    );
+    final auth = AuthSessionProvider(autoLoad: false)
+      ..debugSetSignedInProfile(
+        uid: 'uid-1',
+        email: 'new@example.com',
+        displayName: 'New User',
+        photoUrl: 'https://example.com/new-avatar.png',
+      );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider.value(value: auth),
+          ChangeNotifierProvider(create: (_) => NavigationProvider()),
+          ChangeNotifierProvider(create: (_) => StudyEventProvider()),
+          ChangeNotifierProvider(create: (_) => CertificateProvider()),
+          ChangeNotifierProvider(create: (_) => StudyLogProvider()),
+          ChangeNotifierProvider(create: (_) => GoalProvider()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          routes: {
+            '/achievements': (_) => const Scaffold(body: Text('Achievements')),
+          },
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('New'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey('home-avatar-image-https://example.com/new-avatar.png'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Old'), findsNothing);
+  });
+
+  testWidgets('Home avatar falls back after auth sign-out', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsProvider();
+    await settings.syncGoogleProfileFromAuth(
+      email: 'old@example.com',
+      name: 'Old User',
+      photoUrl: 'https://example.com/old-avatar.png',
+    );
+    final auth = AuthSessionProvider(autoLoad: false)..debugSetSignedOut();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider.value(value: auth),
+          ChangeNotifierProvider(create: (_) => NavigationProvider()),
+          ChangeNotifierProvider(create: (_) => StudyEventProvider()),
+          ChangeNotifierProvider(create: (_) => CertificateProvider()),
+          ChangeNotifierProvider(create: (_) => StudyLogProvider()),
+          ChangeNotifierProvider(create: (_) => GoalProvider()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          routes: {
+            '/achievements': (_) => const Scaffold(body: Text('Achievements')),
+          },
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Estudante'), findsOneWidget);
+    expect(find.text('E'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey('home-avatar-image-https://example.com/old-avatar.png'),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('New goal sheet shows tutorial once and persists completion', (

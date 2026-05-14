@@ -10,9 +10,10 @@ import 'package:study_hub/services/cloud_sync_service.dart';
 import 'package:study_hub/services/storage_service.dart';
 
 class AuthSessionProvider extends ChangeNotifier {
-  AuthSessionProvider({AuthRepository? authRepository})
+  AuthSessionProvider({AuthRepository? authRepository, bool autoLoad = true})
     : _authRepository = authRepository ?? AuthRepository() {
-    unawaited(loadSession());
+    _startFirebaseUserListener();
+    if (autoLoad) unawaited(loadSession());
   }
 
   static const _entryChoiceKey = 'auth_entry_choice';
@@ -32,6 +33,7 @@ class AuthSessionProvider extends ChangeNotifier {
   int _pendingSyncCount = 0;
   bool _isLoading = true;
   bool _hasEntryChoice = false;
+  StreamSubscription<User?>? _firebaseUserSub;
 
   AuthSessionStatus get status => _status;
   AuthDiagnostic? get lastDiagnostic => _lastDiagnostic;
@@ -45,8 +47,15 @@ class AuthSessionProvider extends ChangeNotifier {
   bool get isGuest => _status == AuthSessionStatus.guest;
   bool get isSignedIn => _status == AuthSessionStatus.signedIn;
 
+  @override
+  void dispose() {
+    _firebaseUserSub?.cancel();
+    super.dispose();
+  }
+
   Future<void> loadSession() async {
     debugPrint('[AuthSessionProvider] loadSession start');
+    _startFirebaseUserListener();
     _isLoading = true;
     notifyListeners();
     try {
@@ -58,9 +67,7 @@ class AuthSessionProvider extends ChangeNotifier {
           ? null
           : FirebaseAuth.instance.currentUser;
       if (user != null) {
-        _applyFirebaseUser(user);
-        _status = AuthSessionStatus.signedIn;
-        _hasEntryChoice = true;
+        await _applyAuthenticatedUser(user: user, persist: true);
         debugPrint('[AuthSessionProvider] Firebase user restored: ${user.uid}');
       } else if (entryChoice == _entryGuest) {
         _status = AuthSessionStatus.guest;
@@ -112,16 +119,13 @@ class AuthSessionProvider extends ChangeNotifier {
     await prefs.setString(_entryChoiceKey, _entryGoogle);
     final account = result.googleAccount!;
     final user = result.firebaseCredential?.user;
-    _uid = user?.uid;
-    _email = user?.email ?? account.email;
-    _displayName = user?.displayName ?? account.displayName;
-    _photoUrl = user?.photoURL ?? account.photoUrl;
-    _status = AuthSessionStatus.signedIn;
-    _hasEntryChoice = true;
-
-    await _storage.saveGoogleEmail(_email ?? '');
-    await _storage.saveGoogleName(_displayName ?? '');
-    await _storage.saveGooglePhotoUrl(_photoUrl ?? '');
+    await _applyAuthenticatedUser(
+      user: user,
+      fallbackEmail: account.email,
+      fallbackDisplayName: account.displayName,
+      fallbackPhotoUrl: account.photoUrl,
+      persist: true,
+    );
     notifyListeners();
 
     _pendingSyncCount = await _cloudSync.pendingCount();
@@ -157,11 +161,111 @@ class AuthSessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _applyFirebaseUser(User user) {
-    _uid = user.uid;
-    _email = user.email;
-    _displayName = user.displayName;
-    _photoUrl = user.photoURL;
+  @visibleForTesting
+  void debugSetSignedInProfile({
+    required String uid,
+    String? email,
+    String? displayName,
+    String? photoUrl,
+  }) {
+    _uid = uid;
+    _email = _clean(email);
+    _displayName = _clean(displayName);
+    _photoUrl = _clean(photoUrl);
+    _status = AuthSessionStatus.signedIn;
+    _hasEntryChoice = true;
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void debugSetSignedOut() {
+    _clearUser();
+    _status = AuthSessionStatus.signedOut;
+    _hasEntryChoice = false;
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  void _startFirebaseUserListener() {
+    if (_firebaseUserSub != null || Firebase.apps.isEmpty) return;
+    _firebaseUserSub = FirebaseAuth.instance.userChanges().listen(
+      (user) => unawaited(_handleFirebaseUserChange(user)),
+      onError: (Object error) {
+        debugPrint('[AuthSessionProvider] Firebase user stream error: $error');
+      },
+    );
+  }
+
+  Future<void> _handleFirebaseUserChange(User? user) async {
+    if (user != null) {
+      final changed = await _applyAuthenticatedUser(user: user, persist: true);
+      if (changed) notifyListeners();
+      return;
+    }
+
+    if (_status == AuthSessionStatus.signingIn) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final entryChoice = prefs.getString(_entryChoiceKey);
+    final nextStatus = entryChoice == _entryGuest
+        ? AuthSessionStatus.guest
+        : AuthSessionStatus.signedOut;
+    final nextHasEntryChoice = entryChoice != null;
+    final changed =
+        _status != nextStatus ||
+        _hasEntryChoice != nextHasEntryChoice ||
+        _uid != null ||
+        _email != null ||
+        _displayName != null ||
+        _photoUrl != null;
+
+    _status = nextStatus;
+    _hasEntryChoice = nextHasEntryChoice;
+    _clearUser();
+    await _persistGoogleProfile();
+    _pendingSyncCount = await _cloudSync.pendingCount();
+    if (changed) notifyListeners();
+  }
+
+  Future<bool> _applyAuthenticatedUser({
+    User? user,
+    String? fallbackEmail,
+    String? fallbackDisplayName,
+    String? fallbackPhotoUrl,
+    bool persist = false,
+  }) async {
+    final nextUid = user?.uid;
+    final nextEmail = _clean(user?.email) ?? _clean(fallbackEmail);
+    final nextDisplayName =
+        _clean(user?.displayName) ?? _clean(fallbackDisplayName);
+    final nextPhotoUrl = _clean(user?.photoURL) ?? _clean(fallbackPhotoUrl);
+    final changed =
+        _uid != nextUid ||
+        _email != nextEmail ||
+        _displayName != nextDisplayName ||
+        _photoUrl != nextPhotoUrl ||
+        _status != AuthSessionStatus.signedIn ||
+        !_hasEntryChoice;
+
+    _uid = nextUid;
+    _email = nextEmail;
+    _displayName = nextDisplayName;
+    _photoUrl = nextPhotoUrl;
+    _status = AuthSessionStatus.signedIn;
+    _hasEntryChoice = true;
+    _lastDiagnostic = null;
+
+    if (persist) {
+      await _persistGoogleProfile();
+    }
+    return changed;
+  }
+
+  Future<void> _persistGoogleProfile() async {
+    await _storage.saveGoogleEmail(_email ?? '');
+    await _storage.saveGoogleName(_displayName ?? '');
+    await _storage.saveGooglePhotoUrl(_photoUrl ?? '');
   }
 
   void _clearUser() {
@@ -169,5 +273,10 @@ class AuthSessionProvider extends ChangeNotifier {
     _email = null;
     _displayName = null;
     _photoUrl = null;
+  }
+
+  String? _clean(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 }

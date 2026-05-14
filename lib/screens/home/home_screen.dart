@@ -4,6 +4,7 @@ import 'package:study_hub/config/app_routes.dart';
 import 'package:study_hub/config/app_theme.dart';
 import 'package:study_hub/models/certificate.dart';
 import 'package:study_hub/models/study_goal.dart';
+import 'package:study_hub/providers/auth_session_provider.dart';
 import 'package:study_hub/providers/certificate_provider.dart';
 import 'package:study_hub/providers/goal_provider.dart';
 import 'package:study_hub/providers/navigation_provider.dart';
@@ -68,8 +69,18 @@ class _HeaderSection extends StatelessWidget {
     final spacing = context.spacing;
     return Consumer<SettingsProvider>(
       builder: (context, settings, _) {
-        final userName = settings.settings.userName;
-        final photoUrl = settings.settings.userPhotoUrl;
+        AuthSessionProvider? auth;
+        try {
+          auth = context.watch<AuthSessionProvider>();
+        } on ProviderNotFoundException {
+          auth = null;
+        }
+        final userName = auth == null || auth.isSignedIn
+            ? auth?.displayName ?? settings.settings.userName
+            : null;
+        final photoUrl = auth == null || auth.isSignedIn
+            ? auth?.photoUrl ?? settings.settings.userPhotoUrl
+            : null;
         final firstName = (userName != null && userName.isNotEmpty)
             ? userName.split(' ').first
             : 'Estudante';
@@ -102,7 +113,11 @@ class _HeaderSection extends StatelessWidget {
             SizedBox(width: spacing.sm),
             _AchievementHeaderButton(),
             SizedBox(width: spacing.sm),
-            _Avatar(photoUrl: photoUrl, firstName: firstName),
+            _Avatar(
+              key: ValueKey('home-avatar-${photoUrl ?? 'fallback'}'),
+              photoUrl: photoUrl,
+              firstName: firstName,
+            ),
           ],
         );
       },
@@ -114,7 +129,7 @@ class _Avatar extends StatelessWidget {
   final String? photoUrl;
   final String firstName;
 
-  const _Avatar({required this.photoUrl, required this.firstName});
+  const _Avatar({super.key, required this.photoUrl, required this.firstName});
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +146,8 @@ class _Avatar extends StatelessWidget {
       child: ClipOval(
         child: photoUrl != null && photoUrl!.isNotEmpty
             ? Image.network(
-                photoUrl!,
+                _cacheAwarePhotoUrl(photoUrl!),
+                key: ValueKey('home-avatar-image-$photoUrl'),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _fallback(colors, initial),
               )
@@ -151,6 +167,14 @@ class _Avatar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _cacheAwarePhotoUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) return url;
+    final queryParameters = Map<String, String>.from(uri.queryParameters);
+    queryParameters['studyhub_avatar'] = url.hashCode.abs().toString();
+    return uri.replace(queryParameters: queryParameters).toString();
   }
 }
 

@@ -190,6 +190,40 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> syncGoogleProfileFromAuth({
+    String? email,
+    String? name,
+    String? photoUrl,
+  }) async {
+    final normalizedEmail = _nonEmpty(email);
+    final normalizedName = _nonEmpty(name);
+    final normalizedPhotoUrl = _nonEmpty(photoUrl);
+
+    await _storage.saveGoogleEmail(normalizedEmail ?? '');
+    await _storage.saveGoogleName(normalizedName ?? '');
+    await _storage.saveGooglePhotoUrl(normalizedPhotoUrl ?? '');
+
+    final nextSettings = _settings.copyWith(
+      isGoogleConnected: normalizedEmail != null,
+      googleEmail: normalizedEmail,
+      userName: normalizedName,
+      userPhotoUrl: normalizedPhotoUrl,
+      clearGoogleProfile: normalizedEmail == null,
+      clearGoogleName: normalizedEmail != null && normalizedName == null,
+      clearGooglePhotoUrl:
+          normalizedEmail != null && normalizedPhotoUrl == null,
+    );
+    if (_settings.googleEmail == nextSettings.googleEmail &&
+        _settings.userName == nextSettings.userName &&
+        _settings.userPhotoUrl == nextSettings.userPhotoUrl &&
+        _settings.isGoogleConnected == nextSettings.isGoogleConnected) {
+      return;
+    }
+
+    _settings = nextSettings;
+    notifyListeners();
+  }
+
   /// Signs out from Google and clears local authentication session.
   Future<void> disconnectGoogle() async {
     _setLoading(true);
@@ -205,6 +239,7 @@ class SettingsProvider extends ChangeNotifier {
         googleEmail: null,
         userName: null,
         userPhotoUrl: null,
+        clearGoogleProfile: true,
       );
       await _queueSettingsSync();
     } catch (e) {
@@ -329,5 +364,10 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> _queueSettingsSync({bool flush = true}) async {
     await _cloudSync.enqueueSettings(await _storage.getCloudSettingsSnapshot());
     if (flush) unawaited(_cloudSync.flushQueue());
+  }
+
+  String? _nonEmpty(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 }

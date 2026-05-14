@@ -98,6 +98,9 @@ class AppSettings {
     RegisterFieldSource? registerFieldSource,
     bool clearNotionDatabaseId = false,
     bool clearNotionCategoryField = false,
+    bool clearGoogleProfile = false,
+    bool clearGoogleName = false,
+    bool clearGooglePhotoUrl = false,
   }) {
     return AppSettings(
       isGoogleConnected: isGoogleConnected ?? this.isGoogleConnected,
@@ -107,9 +110,15 @@ class AppSettings {
       notionDatabaseId: clearNotionDatabaseId
           ? null
           : notionDatabaseId ?? this.notionDatabaseId,
-      googleEmail: googleEmail ?? this.googleEmail,
-      userName: userName ?? this.userName,
-      userPhotoUrl: userPhotoUrl ?? this.userPhotoUrl,
+      googleEmail: clearGoogleProfile ? null : googleEmail ?? this.googleEmail,
+      userName: clearGoogleProfile || clearGoogleName
+          ? null
+          : userName ?? this.userName,
+      userPhotoUrl: clearGoogleProfile
+          ? null
+          : clearGooglePhotoUrl
+          ? null
+          : userPhotoUrl ?? this.userPhotoUrl,
       themeMode: themeMode ?? this.themeMode,
       defaultReminderMinutes:
           defaultReminderMinutes ?? this.defaultReminderMinutes,

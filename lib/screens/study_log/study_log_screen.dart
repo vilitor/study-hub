@@ -35,6 +35,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
   final Map<String, TextEditingController> _localControllers = {};
   final Map<String, dynamic> _localDraftValues = {};
   final Map<String, dynamic> _notionDraftValues = {};
+  final TextEditingController _notesDraftController = TextEditingController();
 
   bool _isSaving = false;
   bool _isSyncingNotionSchema = false;
@@ -56,6 +57,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     for (final controller in _localControllers.values) {
       controller.dispose();
     }
+    _notesDraftController.dispose();
     super.dispose();
   }
 
@@ -197,20 +199,19 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
               ),
             ),
           ),
-          if (effectiveSource == RegisterFieldSource.local)
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              right: _notesRightOffset(context),
-              bottom: _notesBottomOffset(
-                context,
-                isTimerActive: timerProvider.isActive,
-              ),
-              child: _NotesFloatingButton(
-                hasDraft: _notesController().text.trim().isNotEmpty,
-                onPressed: _showNotesModal,
-              ),
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            right: _notesRightOffset(context),
+            bottom: _notesBottomOffset(
+              context,
+              isTimerActive: timerProvider.isActive,
             ),
+            child: _NotesFloatingButton(
+              hasDraft: _hasNotesDraft,
+              onPressed: _showNotesModal,
+            ),
+          ),
         ],
       ),
     );
@@ -236,7 +237,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
       log = StudyLog(
         rawValues: rawValues,
         schema: schema,
-        localNote: _buildLocalNote(),
+        localNote: _buildLocalNote(source),
         source: StudyLogSource.local,
         studyTimeField: localTimeField,
       );
@@ -264,6 +265,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
       log = StudyLog(
         rawValues: _collectNotionRawValues(notionProperties),
         schema: notionSchema,
+        localNote: _buildLocalNote(source),
         source: StudyLogSource.notion,
         studyTimeField: notionTimeField,
       );
@@ -499,23 +501,10 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     });
   }
 
-  TextEditingController _notesController() {
-    final fields = context.read<LocalStudySchemaProvider>().activeFields;
-    final notesField = fields.firstWhere(
-      (field) => field.label == LocalStudyFields.notes,
-      orElse: () => LocalStudyField(
-        id: 'local_notes_fallback',
-        label: LocalStudyFields.notes,
-        type: LocalStudyFieldType.longText,
-      ),
-    );
-    return _controllerFor(notesField);
-  }
-
   void _syncLocalFieldControllers(List<LocalStudyField> fields) {
     final activeIds = fields.map((field) => field.id).toSet();
     final removedIds = _localControllers.keys
-        .where((id) => !activeIds.contains(id) && id != 'local_notes_fallback')
+        .where((id) => !activeIds.contains(id))
         .toList();
     for (final id in removedIds) {
       _localControllers.remove(id)?.dispose();
@@ -608,14 +597,25 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     return '';
   }
 
-  StudyLogNote? _buildLocalNote() {
+  bool get _hasNotesDraft => _notesDraftController.text.trim().isNotEmpty;
+
+  StudyLogNote? _buildLocalNote(RegisterFieldSource source) {
+    final summary = _notesDraftController.text.trim().isNotEmpty
+        ? _notesDraftController.text.trim()
+        : source == RegisterFieldSource.local
+        ? _preferredString([LocalStudyFields.notes])
+        : '';
     final note = StudyLogNote(
-      subject: _preferredString([
-        LocalStudyFields.subject,
-        LocalStudyFields.category,
-      ]),
-      contentName: _preferredString([LocalStudyFields.title]),
-      summary: _preferredString([LocalStudyFields.notes]),
+      subject: source == RegisterFieldSource.local
+          ? _preferredString([
+              LocalStudyFields.subject,
+              LocalStudyFields.category,
+            ])
+          : '',
+      contentName: source == RegisterFieldSource.local
+          ? _preferredString([LocalStudyFields.title])
+          : '',
+      summary: summary,
     );
     return note.isNotEmpty ? note : null;
   }
@@ -629,6 +629,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     } else {
       _notionDraftValues.clear();
     }
+    _notesDraftController.clear();
     setState(() {});
   }
 
@@ -707,7 +708,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
                 CustomTextField(
                   label: 'Notas',
                   prefixIcon: Icons.notes_rounded,
-                  controller: _notesController(),
+                  controller: _notesDraftController,
                   maxLines: 8,
                 ),
                 SizedBox(height: spacing.lg),

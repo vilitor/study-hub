@@ -25,6 +25,7 @@ class _SyncCoordinatorState extends State<SyncCoordinator>
     with WidgetsBindingObserver {
   StreamSubscription<dynamic>? _connectivitySub;
   String? _lastSyncedUid;
+  String? _lastAuthProfileKey;
   DateTime? _lastSyncRequestAt;
   static const _retryCooldown = Duration(seconds: 20);
 
@@ -60,6 +61,24 @@ class _SyncCoordinatorState extends State<SyncCoordinator>
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthSessionProvider>();
+    if (!auth.isLoading) {
+      final profileKey = auth.isSignedIn
+          ? '${auth.uid}|${auth.email}|${auth.displayName}|${auth.photoUrl}'
+          : 'signed-out';
+      if (profileKey != _lastAuthProfileKey) {
+        _lastAuthProfileKey = profileKey;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          unawaited(
+            context.read<SettingsProvider>().syncGoogleProfileFromAuth(
+              email: auth.isSignedIn ? auth.email : null,
+              name: auth.isSignedIn ? auth.displayName : null,
+              photoUrl: auth.isSignedIn ? auth.photoUrl : null,
+            ),
+          );
+        });
+      }
+    }
     if (auth.isSignedIn && auth.uid != null && auth.uid != _lastSyncedUid) {
       _lastSyncedUid = auth.uid;
       WidgetsBinding.instance.addPostFrameCallback((_) {
