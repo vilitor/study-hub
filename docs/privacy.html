@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Política de Privacidade | Study Hub</title>
+    <meta
+      name="description"
+      content="Política de Privacidade do Study Hub, com informações sobre LGPD, Firebase, Google Calendar, Notion, Luma e controles de dados."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav">
+        <a class="brand" href="index.html">Study Hub</a>
+        <div class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="terms.html">Termos</a>
+          <a href="index.html#contato">Contato</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="document">
+      <p class="eyebrow">Última atualização: 21 de maio de 2026</p>
+      <h1>Política de Privacidade do Study Hub</h1>
+      <p>
+        Esta Política de Privacidade explica como o Study Hub trata dados
+        pessoais e dados de uso do aplicativo. O Study Hub é um aplicativo
+        local-first para organização de estudos, metas, eventos, registros,
+        certificados e integrações opcionais com Firebase, Google Calendar e
+        Notion.
+      </p>
+
+      <h2>Controlador e contato</h2>
+      <p>
+        Controlador: Study Hub<br />
+        Contato de privacidade/suporte:
+        <a href="mailto:victorfds07@gmail.com">victorfds07@gmail.com</a>
+      </p>
+
+      <h2>Dados tratados</h2>
+      <ul>
+        <li>Dados de login Google: identificador Firebase, e-mail, nome e foto de perfil.</li>
+        <li>Dados de estudo: registros, tempos, matérias, categorias, notas, metas, eventos e histórico.</li>
+        <li>Dados de configuração: tema, lembretes, perfil de estudo, onboarding, campos locais e status de sincronização.</li>
+        <li>Certificados e conquistas cadastrados pelo usuário.</li>
+        <li>Dados de Google Calendar usados para eventos criados, atualizados ou excluídos pelo app.</li>
+        <li>Dados de Notion quando o usuário conecta uma tabela.</li>
+        <li>Contexto local usado pela Luma quando a personalização está ativada.</li>
+      </ul>
+
+      <h2>Onde os dados ficam armazenados</h2>
+      <p>
+        O Study Hub salva dados primeiro no dispositivo. Para usuários
+        autenticados, o backup Firebase grava dados do app em
+        <code>users/{uid}</code> no Firestore. Dados de visitante permanecem
+        locais. Tokens sensíveis, como token do Notion, são armazenados no
+        armazenamento seguro do dispositivo.
+      </p>
+
+      <h2>Google Calendar</h2>
+      <p>
+        O app solicita o escopo
+        <code>https://www.googleapis.com/auth/calendar.events</code> para criar,
+        editar e excluir eventos de calendário relacionados ao uso do Study Hub.
+        O app não solicita acesso amplo para gerenciar calendários completos.
+      </p>
+
+      <h2>Notion</h2>
+      <p>
+        A conexão com Notion é opcional. O token é usado apenas para sincronizar
+        dados com a tabela informada pelo usuário. O app não exclui a conta
+        Notion e não compartilha o token com terceiros.
+      </p>
+
+      <h2>Luma</h2>
+      <p>
+        A Luma V1 é local-first e não envia dados para API externa de IA. A
+        personalização pode ser desativada nas configurações, e a memória local
+        da Luma pode ser limpa pelo usuário.
+      </p>
+
+      <h2>Exclusão e exportação</h2>
+      <p>
+        O usuário pode exportar seus dados em JSON pelo app. A opção “Excluir
+        conta do app” remove dados do Study Hub associados ao usuário no
+        Firebase, limpa dados locais da conta ativa, limpa filas de
+        sincronização e encerra a sessão. Essa ação não exclui a Conta Google, a
+        conta Notion nem eventos externos do Google Calendar.
+      </p>
+
+      <h2>Retenção</h2>
+      <p>
+        Dados locais permanecem no dispositivo até o usuário apagar os dados do
+        app, limpar a conta, excluir a conta do app ou desinstalar o aplicativo.
+        Dados em nuvem permanecem no Firestore enquanto o usuário mantiver o
+        backup ativo e não excluir a conta do app.
+      </p>
+
+      <h2>Direitos do titular</h2>
+      <p>
+        Nos termos da LGPD, o usuário pode solicitar confirmação de tratamento,
+        acesso, correção, portabilidade, eliminação, informação sobre
+        compartilhamento e revogação de consentimento. Os controles principais
+        estão disponíveis no próprio aplicativo; solicitações adicionais devem
+        ser enviadas ao canal de contato publicado.
+      </p>
+
+      <h2>Compartilhamento e segurança</h2>
+      <p>
+        O Study Hub não vende dados pessoais. Dados são enviados apenas aos
+        serviços escolhidos pelo usuário: Firebase para backup, Google Calendar
+        para eventos e Notion para sincronização de tabela. O app usa
+        autenticação Firebase, isolamento por UID no Firestore, armazenamento
+        seguro para tokens locais e regras de acesso que restringem dados ao
+        próprio usuário autenticado.
+      </p>
+    </main>
+
+    <footer class="footer">
+      <a href="index.html">Home</a>
+      <a href="terms.html">Termos de Uso</a>
+      <a href="mailto:victorfds07@gmail.com">Suporte</a>
+    </footer>
+  </body>
+</html>
