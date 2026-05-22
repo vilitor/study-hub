@@ -71,7 +71,7 @@ class NotionService {
       );
 
       if (response.statusCode == 200) {
-        debugPrint('[NotionService] ✅ Page $pageId archived.');
+        debugPrint('[NotionService] Page archived.');
         return true;
       } else {
         debugPrint(

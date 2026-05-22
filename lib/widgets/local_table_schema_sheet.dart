@@ -121,7 +121,7 @@ class LocalTableSchemaSheet extends StatelessWidget {
       SnackbarHelper.showSuccess(context, 'Campo arquivado.');
     } else {
       final error = context.read<LocalStudySchemaProvider>().lastError;
-      SnackbarHelper.showError(context, error ?? 'Nao foi possivel arquivar.');
+      SnackbarHelper.showError(context, error ?? 'Não foi possível arquivar.');
     }
   }
 
@@ -287,7 +287,7 @@ class _LocalFieldFormState extends State<_LocalFieldForm> {
     } else {
       SnackbarHelper.showError(
         context,
-        provider.lastError ?? 'Nao foi possivel salvar o campo.',
+        provider.lastError ?? 'Não foi possível salvar o campo.',
       );
     }
   }

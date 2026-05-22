@@ -13,6 +13,7 @@ import 'package:study_hub/utils/date_helpers.dart';
 import 'package:study_hub/utils/snackbar_helper.dart';
 import 'package:study_hub/utils/validators.dart';
 import 'package:study_hub/widgets/app_modal.dart';
+import 'package:study_hub/widgets/app_surface.dart';
 import 'package:study_hub/widgets/custom_button.dart';
 import 'package:study_hub/widgets/custom_text_field.dart';
 import 'package:study_hub/widgets/full_screen_success_overlay.dart';
@@ -30,7 +31,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  String _selectedSubject = AppConstants.defaultSubjects.first;
+  String _selectedSubject = '';
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
@@ -181,45 +182,65 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ],
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: categories.map((subject) {
-            final isSelected = _selectedSubject == subject;
-            final index = categories.indexOf(subject);
-            final color = AppColors.getSubjectColor(index);
+        if (categories.isEmpty)
+          AppSurface.subtle(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: context.colors.accent,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Seu espaço está limpo. Toque em Matérias para adicionar a primeira matéria manualmente.',
+                    style: context.theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: categories.map((subject) {
+              final isSelected = _selectedSubject == subject;
+              final index = categories.indexOf(subject);
+              final color = AppColors.getSubjectColor(index);
 
-            return GestureDetector(
-              onTap: () {
-                AppHaptics.selection();
-                setState(() => _selectedSubject = subject);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? color : color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? color : Colors.transparent,
-                    width: 1.5,
+              return GestureDetector(
+                onTap: () {
+                  AppHaptics.selection();
+                  setState(() => _selectedSubject = subject);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? color : color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? color : Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Text(
+                    subject,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : color,
+                    ),
                   ),
                 ),
-                child: Text(
-                  subject,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : color,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
+              );
+            }).toList(),
+          ),
       ],
     );
   }
@@ -460,6 +481,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (_isLoading || !_formKey.currentState!.validate()) {
       return;
     }
+    if (_selectedSubject.trim().isEmpty) {
+      SnackbarHelper.showWarning(
+        context,
+        'Adicione ou selecione uma materia antes de salvar.',
+      );
+      return;
+    }
 
     final timeError = Validators.timeRange(
       _startTime.hour,
@@ -476,7 +504,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final saved = await context.read<StudyEventProvider>().addEvent(event);
+      final provider = context.read<StudyEventProvider>();
+      final saved = await provider.addEvent(event);
       if (!mounted) {
         return;
       }
@@ -484,7 +513,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         SnackbarHelper.showError(context, 'Erro ao criar evento.');
         return;
       }
-      await _showEventSuccessAndFinish();
+      await _showEventSuccessAndFinish(
+        calendarWarning: provider.lastCalendarError,
+      );
     } catch (e) {
       if (mounted) {
         SnackbarHelper.showError(context, 'Erro ao criar evento: $e');
@@ -498,6 +529,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   Future<void> _saveToGoogleCalendar() async {
     if (_isLoading || !_formKey.currentState!.validate()) {
+      return;
+    }
+    if (_selectedSubject.trim().isEmpty) {
+      SnackbarHelper.showWarning(
+        context,
+        'Adicione ou selecione uma materia antes de salvar.',
+      );
       return;
     }
 
@@ -522,9 +560,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final saved = await context.read<StudyEventProvider>().addEvent(
-        _buildEvent(),
-      );
+      final provider = context.read<StudyEventProvider>();
+      final saved = await provider.addEvent(_buildEvent());
       if (!mounted) {
         return;
       }
@@ -532,7 +569,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         SnackbarHelper.showError(context, 'Erro ao criar evento.');
         return;
       }
-      await _showEventSuccessAndFinish();
+      await _showEventSuccessAndFinish(
+        calendarWarning: provider.lastCalendarError,
+      );
     } catch (e) {
       if (mounted) {
         SnackbarHelper.showError(context, 'Erro ao criar evento: $e');
@@ -565,7 +604,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _titleController.clear();
     _descriptionController.clear();
     setState(() {
-      _selectedSubject = AppConstants.defaultSubjects.first;
+      _selectedSubject = '';
       _selectedDate = DateTime.now();
       _startTime = const TimeOfDay(hour: 9, minute: 0);
       _endTime = const TimeOfDay(hour: 10, minute: 0);
@@ -574,8 +613,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _formKey.currentState?.reset();
   }
 
-  Future<void> _showEventSuccessAndFinish() async {
+  Future<void> _showEventSuccessAndFinish({String? calendarWarning}) async {
+    final hasCalendarWarning =
+        calendarWarning != null && calendarWarning.trim().isNotEmpty;
     await FullScreenSuccessOverlay.show(context, message: 'Evento concluído');
+    if (!mounted) return;
+    if (hasCalendarWarning) {
+      SnackbarHelper.showWarning(context, calendarWarning.trim());
+    }
     if (!mounted) return;
     _finishSuccessFlow();
   }

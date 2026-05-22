@@ -1,29 +1,31 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:study_hub/models/study_event.dart';
 import 'package:study_hub/repositories/study_repository.dart';
 
-/// Provider that manages the state of planned study events.
-/// It synchronizes with [StudyRepository] for local and remote (Google Calendar) persistence.
+/// Provider that manages planned study events.
 class StudyEventProvider extends ChangeNotifier {
-  final StudyRepository _repository = StudyRepository();
+  final StudyRepository _repository;
   final List<StudyEvent> _events = [];
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+  String? _lastCalendarError;
 
-  // ── Getters ──
+  StudyEventProvider({StudyRepository? repository})
+    : _repository = repository ?? StudyRepository() {
+    loadEvents();
+  }
 
   List<StudyEvent> get events => List.unmodifiable(_events);
   DateTime get selectedDate => _selectedDate;
   bool get isLoading => _isLoading;
   int get totalEvents => _events.length;
+  String? get lastCalendarError => _lastCalendarError;
 
-  /// Returns events scheduled for the selected calendar day.
   List<StudyEvent> get eventsForSelectedDay => getEventsForDate(_selectedDate);
-
-  /// Returns events scheduled for today.
   List<StudyEvent> get todayEvents => getEventsForDate(DateTime.now());
 
-  /// Returns filtered and sorted events for a specific date.
   List<StudyEvent> getEventsForDate(DateTime date) {
     return _events.where((event) {
       return event.date.year == date.year &&
@@ -36,28 +38,20 @@ class StudyEventProvider extends ChangeNotifier {
     });
   }
 
-  // ── Life Cycle ──
-
-  StudyEventProvider() {
-    loadEvents();
-  }
-
-  // ── Actions ──
-
-  /// Changes the currently selected date in the horizontal calendar.
   void selectDate(DateTime date) {
     _selectedDate = date;
     notifyListeners();
   }
 
-  /// Initial load of events from local storage.
   Future<void> loadEvents() async {
     _setLoading(true);
     try {
       final loadedEvents = await _repository.getLocalEvents();
-      _events.clear();
-      _events.addAll(loadedEvents);
+      _events
+        ..clear()
+        ..addAll(loadedEvents);
       notifyListeners();
+      unawaited(_retryPendingCalendarSync());
     } catch (e) {
       debugPrint('Error loading events: $e');
     } finally {
@@ -65,53 +59,50 @@ class StudyEventProvider extends ChangeNotifier {
     }
   }
 
-  /// Adds a new event to the schedule and attempts to sync with Google Calendar.
   Future<bool> addEvent(StudyEvent event) async {
     if (_isLoading) {
-      debugPrint(
-        '[StudyEventProvider] ⚠️ Blocked: Operation already in progress.',
-      );
+      debugPrint('[StudyEventProvider] Blocked: operation in progress.');
       return false;
     }
 
     _setLoading(true);
-    debugPrint(
-      '[StudyEventProvider] 🚀 Initiating addEvent for: ${event.title}',
-    );
+    debugPrint('[StudyEventProvider] addEvent start: ${event.id}');
 
     try {
-      // The repository handles both remote sync and local storage
       final googleId = await _repository.scheduleEvent(event);
-
-      // Update local state with the synced version
+      _lastCalendarError = _repository.lastCalendarError;
       final syncedEvent = event.copyWith(
         calendarEventId: googleId,
         syncedWithCalendar: googleId != null,
+        syncStatus: event.syncStatus,
       );
 
-      _events.add(syncedEvent);
+      final storedEvents = await _repository.getLocalEvents();
+      final stored = storedEvents.firstWhere(
+        (item) => item.id == event.id,
+        orElse: () => syncedEvent,
+      );
+      _events.removeWhere((item) => item.id == stored.id);
+      _events.add(stored);
       notifyListeners();
-      debugPrint('[StudyEventProvider] ✅ addEvent completed.');
+      debugPrint('[StudyEventProvider] addEvent complete.');
       return true;
     } catch (e) {
-      debugPrint('[StudyEventProvider] ❌ Error adding event: $e');
+      debugPrint('[StudyEventProvider] Error adding event: $e');
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  /// Updates an existing event locally and persists it.
   Future<bool> updateEvent(StudyEvent updatedEvent) async {
     if (_isLoading) {
-      debugPrint(
-        '[StudyEventProvider] ⚠️ Blocked: Operation already in progress.',
-      );
+      debugPrint('[StudyEventProvider] Blocked: operation in progress.');
       return false;
     }
 
     _setLoading(true);
-    final index = _events.indexWhere((e) => e.id == updatedEvent.id);
+    final index = _events.indexWhere((event) => event.id == updatedEvent.id);
     try {
       await _repository.updateEvent(updatedEvent);
       if (index != -1) {
@@ -122,50 +113,57 @@ class StudyEventProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('[StudyEventProvider] ❌ Error updating event: $e');
+      debugPrint('[StudyEventProvider] Error updating event: $e');
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  /// Simple removal from local state.
   void removeEvent(String eventId) {
-    _events.removeWhere((e) => e.id == eventId);
+    _events.removeWhere((event) => event.id == eventId);
     notifyListeners();
   }
 
-  /// Removes an event and its remote counterpart (if synced).
-  /// Returns [true] if successfully deleted (or not synced).
   Future<bool> deleteEvent(StudyEvent event) async {
     if (_isLoading) {
-      debugPrint(
-        '[StudyEventProvider] ⚠️ Blocked: Deletion already in progress.',
-      );
+      debugPrint('[StudyEventProvider] Blocked: deletion in progress.');
       return false;
     }
 
     _setLoading(true);
-    debugPrint(
-      '[StudyEventProvider] 🗑️ Initiating deleteEvent for: ${event.id}',
-    );
+    debugPrint('[StudyEventProvider] deleteEvent start: ${event.id}');
 
     try {
       final success = await _repository.deleteEvent(event);
       if (success) {
         removeEvent(event.id);
-        debugPrint('[StudyEventProvider] ✅ Event removed from state.');
       }
       return success;
     } catch (e) {
-      debugPrint('[StudyEventProvider] ❌ Error deleting event: $e');
+      debugPrint('[StudyEventProvider] Error deleting event: $e');
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  // ── Helpers ──
+  Future<void> retryPendingCalendarSync() => _retryPendingCalendarSync();
+
+  Future<void> _retryPendingCalendarSync() async {
+    try {
+      final synced = await _repository.syncPendingCalendarEvents();
+      _lastCalendarError = _repository.lastCalendarError;
+      if (synced == 0) return;
+      final loadedEvents = await _repository.getLocalEvents();
+      _events
+        ..clear()
+        ..addAll(loadedEvents);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[StudyEventProvider] Calendar retry failed: $e');
+    }
+  }
 
   void _setLoading(bool value) {
     _isLoading = value;

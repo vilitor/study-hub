@@ -1,119 +1,229 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:study_hub/config/app_theme.dart';
+import 'package:study_hub/models/cloud_sync.dart';
+import 'package:study_hub/providers/ai_assistant_provider.dart';
+import 'package:study_hub/providers/settings_provider.dart';
+import 'package:study_hub/services/cloud_sync_service.dart';
+import 'package:study_hub/services/data_export_service.dart';
+import 'package:study_hub/utils/snackbar_helper.dart';
+import 'package:study_hub/widgets/app_surface.dart';
 
-/// Screen that explains how user data is handled (LGPD Compliance)
-class PrivacyPolicyScreen extends StatelessWidget {
+class PrivacyPolicyScreen extends StatefulWidget {
   const PrivacyPolicyScreen({super.key});
 
   @override
+  State<PrivacyPolicyScreen> createState() => _PrivacyPolicyScreenState();
+}
+
+class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
+  final DataExportService _exportService = DataExportService();
+  bool _isExporting = false;
+
+  @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    final settings = context.watch<SettingsProvider>();
+    final syncState = context.watch<CloudSyncService>().state;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Privacidade e segurança')),
+      appBar: AppBar(title: const Text('Privacidade e dados')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+          spacing.screenPadding,
+          spacing.lg,
+          spacing.screenPadding,
+          spacing.sectionGap,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              Icons.security_rounded,
-              size: 64,
-              color: AppColors.primaryGreen,
+            const AppSectionHeader(
+              title: 'Controle dos seus dados',
+              subtitle:
+                  'O Study Hub é local-first: você controla o que fica no dispositivo, o que vai para o Firebase e quais integrações externas são usadas.',
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Sua privacidade é prioridade',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'O StudyHub foi projetado com transparência e segurança. Esta tela explica como suas informações são tratadas de acordo com boas práticas de proteção de dados.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(context).textTheme.bodyMedium?.color,
-              ),
-            ),
-            const SizedBox(height: 32),
-            _buildSection(
-              context,
-              icon: Icons.storage_rounded,
+            SizedBox(height: spacing.lg),
+            _InfoTile(
+              icon: Icons.phone_android_rounded,
               title: 'Armazenamento local',
-              content:
-                  'Seus registros de estudo e eventos da agenda ficam armazenados localmente no dispositivo. O app não mantém um banco central para monitorar seus hábitos de estudo.',
+              body:
+                  'Registros, eventos, metas, certificados, configuração da plataforma e preferências da conta ficam salvos primeiro neste dispositivo.',
             ),
-            _buildSection(
-              context,
-              icon: Icons.phonelink_lock_rounded,
-              title: 'Credenciais seguras',
-              content:
-                  'Dados sensíveis, como o token do Notion, são criptografados e armazenados com armazenamento seguro do dispositivo.',
+            _InfoTile(
+              icon: Icons.cloud_done_rounded,
+              title: 'Backup Firebase',
+              body:
+                  'Quando você entra com Google, o backup grava apenas dados do app em users/{uid}. A conta visitante permanece local.',
+              trailing: Text(_syncLabel(syncState)),
             ),
-            _buildSection(
-              context,
-              icon: Icons.sync_rounded,
-              title: 'Integrações transparentes',
-              content:
-                  'Os dados só são enviados ao Notion ou Google Calendar quando você autoriza e inicia uma sincronização.',
+            _InfoTile(
+              icon: Icons.event_available_rounded,
+              title: 'Google Calendar',
+              body:
+                  'O app solicita acesso somente a eventos do calendário para criar, atualizar ou excluir eventos que você sincronizar.',
             ),
-            _buildSection(
-              context,
-              icon: Icons.no_accounts_rounded,
-              title: 'Sem venda de dados',
-              content:
-                  'O app não coleta, vende ou compartilha seus dados com anunciantes. Seus dados pertencem a você.',
+            _InfoTile(
+              icon: Icons.table_chart_rounded,
+              title: 'Notion',
+              body:
+                  'O token do Notion fica no armazenamento seguro do dispositivo. O app usa esse token apenas quando você conecta e sincroniza uma tabela.',
             ),
-            const SizedBox(height: 40),
-            Center(
-              child: Text(
-                'v1.0.0 • Arquitetura compatível com a LGPD',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+            _InfoTile(
+              icon: Icons.auto_awesome_rounded,
+              title: 'Luma local-first',
+              body:
+                  'A Luma V1 não usa API externa de IA. As respostas são geradas localmente a partir dos dados do app, quando a personalização está ativa.',
+            ),
+            SizedBox(height: spacing.sectionGap),
+            AppSurface(
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: settings.settings.lumaPersonalizationEnabled,
+                title: const Text('Personalização da Luma'),
+                subtitle: const Text(
+                  'Permitir que a Luma use dados locais da conta para sugestões e buscas dentro do app.',
+                ),
+                onChanged: (value) async {
+                  await settings.setLumaPersonalizationEnabled(value);
+                  if (!context.mounted) return;
+                  if (!value) {
+                    context.read<AiAssistantProvider>().resetForAccount();
+                  }
+                  SnackbarHelper.showInfo(
+                    context,
+                    value
+                        ? 'Personalização da Luma ativada.'
+                        : 'Personalização da Luma desativada.',
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: spacing.sm),
+            AppSurface(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.cleaning_services_rounded,
+                  color: context.colors.accent,
+                ),
+                title: const Text('Limpar memória da Luma'),
+                subtitle: const Text(
+                  'Apaga a conversa local atual da Luma. Seus registros, metas e eventos não são removidos.',
+                ),
+                trailing: const Icon(Icons.refresh_rounded),
+                onTap: () {
+                  context.read<AiAssistantProvider>().resetForAccount();
+                  SnackbarHelper.showSuccess(
+                    context,
+                    'Memória local da Luma limpa.',
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: spacing.sm),
+            AppSurface(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.download_rounded,
+                  color: context.colors.accentSecondary,
+                ),
+                title: const Text('Exportar meus dados'),
+                subtitle: const Text(
+                  'Gera um arquivo JSON local com registros, metas, eventos, certificados e configurações da conta ativa.',
+                ),
+                trailing: _isExporting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.arrow_forward_rounded),
+                onTap: _isExporting ? null : _exportData,
+              ),
+            ),
+            SizedBox(height: spacing.sectionGap),
+            const AppSectionHeader(
+              title: 'Direitos e transparência',
+              subtitle:
+                  'Você pode exportar dados, excluir a conta do app e desconectar integrações. A exclusão não remove sua Conta Google, conta Notion nem eventos externos do Calendar.',
+            ),
+            SizedBox(height: spacing.md),
+            _PolicyText(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSection(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String content,
-  }) {
+  Future<void> _exportData() async {
+    setState(() => _isExporting = true);
+    try {
+      final result = await _exportService.exportActiveAccountData();
+      if (!mounted) return;
+      SnackbarHelper.showSuccess(
+        context,
+        'Exportação concluída: ${result.filePath}',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      SnackbarHelper.showError(
+        context,
+        'Não foi possível exportar os dados agora.',
+      );
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  String _syncLabel(CloudSyncState syncState) {
+    if (syncState.lastSyncedAt != null) {
+      return 'Backup ativo';
+    }
+    if (syncState.pendingCount > 0) {
+      return '${syncState.pendingCount} pendente(s)';
+    }
+    return 'Local-first';
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  final Widget? trailing;
+
+  const _InfoTile({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.primaryGreen, size: 28),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      padding: EdgeInsets.only(bottom: context.spacing.sm),
+      child: AppSurface.subtle(
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(icon, color: context.colors.accent),
+          title: Text(title),
+          subtitle: Text(body),
+          trailing: trailing,
+        ),
       ),
+    );
+  }
+}
+
+class _PolicyText extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Política resumida: o Study Hub coleta apenas os dados necessários para organizar sua rotina de estudos e operar integrações escolhidas por você. Dados autenticados são gravados em uma área própria do usuário no Firebase. Dados de visitante ficam no dispositivo. Tokens e credenciais não são exibidos em logs. Para a versão pública, publique a Política de Privacidade e os Termos de Uso em um domínio do app e use esses links na tela de consentimento OAuth.',
+      style: context.theme.textTheme.bodyMedium,
     );
   }
 }

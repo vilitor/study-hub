@@ -18,8 +18,11 @@ import 'package:study_hub/screens/splash/startup_gate.dart';
 import 'package:study_hub/screens/settings/settings_screen.dart';
 import 'package:study_hub/services/auth_service.dart';
 import 'package:study_hub/services/cloud_sync_service.dart';
+import 'package:study_hub/services/google_calendar_service.dart';
 import 'package:study_hub/services/storage_service.dart';
 import 'package:study_hub/services/sync_merge_resolver.dart';
+import 'package:study_hub/repositories/study_repository.dart';
+import 'package:study_hub/repositories/auth_repository.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +30,8 @@ void main() {
     'plugins.it_nomads.com/flutter_secure_storage',
   );
 
-  setUp(() {
+  setUp(() async {
+    await StorageService().useGuestNamespace();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageChannel, (call) async => null);
   });
@@ -63,6 +67,36 @@ void main() {
     final queue = await storage.getSyncQueue();
     expect(queue, hasLength(1));
     expect(queue.single.payload['value'], 2);
+  });
+
+  test('namespace migration recovers from corrupted secure storage', () async {
+    SharedPreferences.setMockInitialValues({});
+    final deletedKeys = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (call) async {
+          switch (call.method) {
+            case 'read':
+              throw PlatformException(
+                code: 'Exception encountered',
+                message: 'read',
+                details:
+                    'javax.crypto.BadPaddingException: error:1e000065:Cipher functions:OPENSSL_internal:BAD_DECRYPT',
+              );
+            case 'delete':
+              deletedKeys.add(call.arguments['key'] as String);
+              return null;
+            case 'write':
+              return null;
+          }
+          return null;
+        });
+
+    final storage = StorageService();
+
+    await storage.useUidNamespace('firebase-user', migrateLegacyUnscoped: true);
+
+    expect(storage.activeNamespace, 'uid:firebase-user');
+    expect(deletedKeys, isNotEmpty);
   });
 
   test('sync queue marks retry with bounded backoff metadata', () {
@@ -105,6 +139,39 @@ void main() {
     expect(restored.lastError, 'Offline mode active');
   });
 
+  test('stale syncing cloud state is normalized on load', () async {
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    await storage.saveCloudSyncState(
+      CloudSyncState(
+        phase: CloudSyncPhase.syncing,
+        lastAttemptAt: DateTime.now().subtract(const Duration(minutes: 2)),
+      ),
+    );
+
+    await CloudSyncService.instance.loadState();
+
+    expect(CloudSyncService.instance.state.phase, CloudSyncPhase.timeout);
+    expect(CloudSyncService.instance.state.lastError, contains('interrompida'));
+  });
+
+  test('reset run context clears visible syncing state', () async {
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    await storage.saveCloudSyncState(
+      CloudSyncState(
+        phase: CloudSyncPhase.syncing,
+        lastAttemptAt: DateTime.now(),
+      ),
+    );
+    await CloudSyncService.instance.loadState();
+
+    CloudSyncService.instance.resetRunContext();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(CloudSyncService.instance.state.isSyncing, isFalse);
+  });
+
   test('newest merge policy keeps the latest updatedAt value', () {
     final local = StudyGoal(
       id: 'goal-1',
@@ -144,10 +211,10 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues({
         AppConstants.prefKeyThemeMode: 'dark',
-        AppConstants.prefKeyDefaultReminder: 30,
-        'app_custom_categories': <String>['Flutter'],
       });
       final storage = StorageService();
+      await storage.saveDefaultReminder(30);
+      await storage.saveCustomCategories(['Flutter']);
 
       final snapshot = await storage.getCloudSettingsSnapshot();
 
@@ -237,6 +304,62 @@ void main() {
     expect(queue.last.canRetry, isTrue);
   });
 
+  test(
+    'Google Calendar creation is triggered after local event save',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = StorageService();
+      final calendar = _FakeCalendarService(
+        result: const CalendarCreateResult.success('google-1'),
+      );
+      final repository = StudyRepository(
+        storageService: storage,
+        googleCalendarService: calendar,
+      );
+      final event = _event();
+
+      final googleId = await repository.scheduleEvent(event);
+      final stored = await storage.getStudyEvents();
+
+      expect(calendar.createRequests, 1);
+      expect(googleId, 'google-1');
+      expect(stored.single.calendarEventId, 'google-1');
+      expect(stored.single.syncedWithCalendar, isTrue);
+    },
+  );
+
+  test('Calendar failure keeps local event pending for retry', () async {
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    final calendar = _FakeCalendarService(
+      result: const CalendarCreateResult.failure('token invalid'),
+    );
+    final repository = StudyRepository(
+      storageService: storage,
+      googleCalendarService: calendar,
+    );
+    final event = _event();
+
+    final googleId = await repository.scheduleEvent(event);
+    final stored = await storage.getStudyEvents();
+
+    expect(calendar.createRequests, 1);
+    expect(googleId, isNull);
+    expect(repository.lastCalendarError, 'token invalid');
+    expect(stored.single.syncedWithCalendar, isFalse);
+    expect(stored.single.calendarEventId, isNull);
+    expect(stored.single.syncStatus, CloudSyncStatus.pendingSync);
+  });
+
+  test('Calendar API disabled error is converted to actionable copy', () {
+    final message = GoogleCalendarService.friendlyCalendarError(
+      'DetailedApiRequestError(status: 403, message: Google Calendar API has not been used in project 539437186516 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=539437186516 then retry.)',
+    );
+
+    expect(message, contains('API Google Calendar está desativada'));
+    expect(message, contains('calendar-json.googleapis.com'));
+  });
+
   test('timeout and error sync states are not active syncing states', () {
     const syncing = CloudSyncState(phase: CloudSyncPhase.syncing);
 
@@ -306,14 +429,14 @@ void main() {
     },
   );
 
-  test('Google Calendar scopes are preserved for shared sign-in', () {
-    expect(
-      AuthService.calendarScopes,
-      contains('https://www.googleapis.com/auth/calendar'),
-    );
+  test('Google Calendar sign-in uses the narrow event scope only', () {
     expect(
       AuthService.calendarScopes,
       contains('https://www.googleapis.com/auth/calendar.events'),
+    );
+    expect(
+      AuthService.calendarScopes,
+      isNot(contains('https://www.googleapis.com/auth/calendar')),
     );
   });
 
@@ -359,6 +482,32 @@ void main() {
       expect(provider.uid, isNull);
     },
   );
+
+  test('guest entry clears loading and activates guest namespace', () async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = AuthSessionProvider(autoLoad: false);
+
+    await provider.continueAsGuest();
+
+    expect(provider.isLoading, isFalse);
+    expect(provider.status, AuthSessionStatus.guest);
+    expect(StorageService().activeNamespace, StorageService.guestNamespace);
+  });
+
+  test('Google login timeout does not leave auth stuck loading', () async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = AuthSessionProvider(
+      authRepository: _HangingAuthRepository(),
+      sessionTimeout: const Duration(milliseconds: 10),
+      autoLoad: false,
+    );
+
+    final success = await provider.signInWithGoogle();
+
+    expect(success, isFalse);
+    expect(provider.isLoading, isFalse);
+    expect(provider.status, AuthSessionStatus.authError);
+  });
 
   testWidgets('fresh startup shows dedicated login screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -476,4 +625,42 @@ void main() {
     expect(find.text('Backup na nuvem'), findsOneWidget);
     expect(find.textContaining('Modo offline ativo'), findsOneWidget);
   });
+}
+
+class _FakeCalendarService extends GoogleCalendarService {
+  final CalendarCreateResult result;
+  int createRequests = 0;
+
+  _FakeCalendarService({required this.result});
+
+  @override
+  Future<CalendarCreateResult> createEventWithResult(StudyEvent event) async {
+    createRequests++;
+    return result;
+  }
+}
+
+class _HangingAuthRepository extends AuthRepository {
+  @override
+  Future<GoogleFirebaseSignInResult> login() {
+    return Future<GoogleFirebaseSignInResult>.delayed(
+      const Duration(minutes: 5),
+      () => GoogleFirebaseSignInResult.failure(
+        const AuthDiagnostic(
+          reason: AuthFailureReason.unknown,
+          message: 'late failure',
+        ),
+      ),
+    );
+  }
+}
+
+StudyEvent _event() {
+  return StudyEvent(
+    subject: 'Medicina',
+    title: 'Revisar anatomia',
+    date: DateTime(2026, 5, 20),
+    startTime: const TimeOfDay(hour: 9, minute: 0),
+    endTime: const TimeOfDay(hour: 10, minute: 0),
+  );
 }

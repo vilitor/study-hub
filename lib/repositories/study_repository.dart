@@ -10,9 +10,21 @@ import 'package:study_hub/services/storage_service.dart';
 
 /// Repository that orchestrates Study-related data operations.
 class StudyRepository {
-  final StorageService _storageService = StorageService();
-  final GoogleCalendarService _googleCalendarService = GoogleCalendarService();
-  final CloudSyncService _cloudSyncService = CloudSyncService.instance;
+  final StorageService _storageService;
+  final GoogleCalendarService _googleCalendarService;
+  final CloudSyncService _cloudSyncService;
+  String? _lastCalendarError;
+
+  StudyRepository({
+    StorageService? storageService,
+    GoogleCalendarService? googleCalendarService,
+    CloudSyncService? cloudSyncService,
+  }) : _storageService = storageService ?? StorageService(),
+       _googleCalendarService =
+           googleCalendarService ?? GoogleCalendarService(),
+       _cloudSyncService = cloudSyncService ?? CloudSyncService.instance;
+
+  String? get lastCalendarError => _lastCalendarError;
 
   Future<bool> saveLog(StudyLog log) async {
     final logToSave = log.copyWith(
@@ -58,14 +70,19 @@ class StudyRepository {
     await _cloudSyncService.enqueueStudyEvent(pendingEvent);
     unawaited(_cloudSyncService.flushQueue());
 
-    final googleId = await _googleCalendarService.createEvent(event);
+    final result = await _googleCalendarService.createEventWithResult(
+      pendingEvent,
+    );
+    final googleId = result.eventId;
     if (googleId == null) {
+      _lastCalendarError = result.errorMessage;
       debugPrint(
-        '[StudyRepository] Remote Calendar sync failed; event stayed local.',
+        '[StudyRepository] Remote Calendar sync pending: ${result.errorMessage}',
       );
       return null;
     }
 
+    _lastCalendarError = null;
     final syncedEvent = pendingEvent.copyWith(
       calendarEventId: googleId,
       syncedWithCalendar: true,
@@ -76,6 +93,39 @@ class StudyRepository {
     await _cloudSyncService.enqueueStudyEvent(syncedEvent);
     unawaited(_cloudSyncService.flushQueue());
     return googleId;
+  }
+
+  Future<int> syncPendingCalendarEvents() async {
+    final currentEvents = await _storageService.getStudyEvents();
+    var syncedCount = 0;
+    for (final event in currentEvents.where(
+      (event) =>
+          event.deletedAt == null &&
+          !event.syncedWithCalendar &&
+          event.calendarEventId == null,
+    )) {
+      final result = await _googleCalendarService.createEventWithResult(event);
+      final googleId = result.eventId;
+      if (googleId == null) {
+        _lastCalendarError = result.errorMessage;
+        continue;
+      }
+
+      _lastCalendarError = null;
+      final syncedEvent = event.copyWith(
+        calendarEventId: googleId,
+        syncedWithCalendar: true,
+        updatedAt: DateTime.now(),
+        syncStatus: CloudSyncStatus.pendingSync,
+      );
+      await _upsertEventLocally(syncedEvent);
+      await _cloudSyncService.enqueueStudyEvent(syncedEvent);
+      syncedCount++;
+    }
+    if (syncedCount > 0) {
+      unawaited(_cloudSyncService.flushQueue());
+    }
+    return syncedCount;
   }
 
   Future<void> updateEvent(StudyEvent event) async {
@@ -99,12 +149,15 @@ class StudyRepository {
     }
 
     if (!remoteDeleted) {
+      _lastCalendarError =
+          'Não foi possível excluir este evento no Google Calendar. Verifique a conexão e a integração Google.';
       debugPrint(
         '[StudyRepository] Calendar deletion failed. Local state preserved.',
       );
       return false;
     }
 
+    _lastCalendarError = null;
     final currentEvents = await _storageService.getStudyEvents();
     final countBefore = currentEvents.length;
     currentEvents.removeWhere((e) => e.id == event.id);

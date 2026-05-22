@@ -76,10 +76,78 @@ class CloudSyncService extends ChangeNotifier {
   Future<void> loadState() async {
     _state = await _storage.getCloudSyncState();
     _state = _state.copyWith(pendingCount: await pendingCount());
+    if (_state.phase == CloudSyncPhase.syncing) {
+      final lastAttempt = _state.lastAttemptAt;
+      final isStale =
+          lastAttempt == null ||
+          DateTime.now().difference(lastAttempt) > syncRunTimeout;
+      _state = _state.copyWith(
+        phase: isStale ? CloudSyncPhase.timeout : CloudSyncPhase.idle,
+        lastError: isStale ? 'Sincronização anterior foi interrompida.' : null,
+      );
+      await _storage.saveCloudSyncState(_state);
+    }
     notifyListeners();
   }
 
   Future<int> pendingCount() async => (await _storage.getSyncQueue()).length;
+
+  Future<void> resetLocalState() async {
+    _state = const CloudSyncState();
+    _isWorking = false;
+    _isFlushingQueue = false;
+    _runToken++;
+    notifyListeners();
+  }
+
+  void resetRunContext() {
+    _isWorking = false;
+    _isFlushingQueue = false;
+    _runToken++;
+    _state = _state.copyWith(
+      phase: _state.pendingCount > 0
+          ? CloudSyncPhase.pending
+          : CloudSyncPhase.idle,
+      clearError: true,
+    );
+    notifyListeners();
+    unawaited(_refreshAndPersistIdleStateAfterReset());
+    debugPrint('[SYNC] queue scoped to active account namespace');
+  }
+
+  Future<void> _refreshAndPersistIdleStateAfterReset() async {
+    final pending = await pendingCount();
+    _state = _state.copyWith(
+      phase: pending > 0 ? CloudSyncPhase.pending : CloudSyncPhase.idle,
+      pendingCount: pending,
+      clearError: true,
+    );
+    await _storage.saveCloudSyncState(_state);
+    notifyListeners();
+  }
+
+  Future<void> deleteCurrentUserData({String? uid}) async {
+    if (!canUseFirebase) return;
+    final userId = uid ?? _currentUser?.uid;
+    if (userId == null || userId.isEmpty) return;
+    final firestore = FirebaseFirestore.instance;
+    final userDoc = firestore.collection('users').doc(userId);
+    final collections = const [
+      CloudCollections.records,
+      CloudCollections.studyLogs,
+      CloudCollections.studyEvents,
+      CloudCollections.goals,
+      CloudCollections.certificates,
+      CloudCollections.legacyAchievements,
+      CloudCollections.settings,
+      CloudCollections.localConfig,
+      CloudCollections.syncMeta,
+    ];
+    for (final collection in collections) {
+      await _deleteCollection(userDoc.collection(collection));
+    }
+    await userDoc.delete().timeout(writeTimeout);
+  }
 
   Future<void> enqueueStudyLog(StudyLog log) async {
     await _enqueue(
@@ -250,6 +318,7 @@ class CloudSyncService extends ChangeNotifier {
 
     _isWorking = true;
     final runToken = ++_runToken;
+    final namespace = _storage.activeNamespace;
     await _setState(
       _state.copyWith(
         phase: CloudSyncPhase.syncing,
@@ -263,9 +332,20 @@ class CloudSyncService extends ChangeNotifier {
       debugPrint('[CloudSyncService] sync start restoreFirst=$restoreFirst');
       await _runSynchronize(
         runToken: runToken,
+        namespace: namespace,
         restoreFirst: restoreFirst,
         onCollectionRestored: onCollectionRestored,
       ).timeout(syncRunTimeout);
+      if (_runToken == runToken && _state.phase == CloudSyncPhase.syncing) {
+        final pending = await pendingCount();
+        await _setState(
+          _state.copyWith(
+            phase: pending > 0 ? CloudSyncPhase.pending : CloudSyncPhase.idle,
+            pendingCount: pending,
+            clearError: true,
+          ),
+        );
+      }
     } on TimeoutException catch (e) {
       debugPrint('[CloudSyncService] sync timeout after $syncRunTimeout');
       if (_runToken == runToken) {
@@ -296,27 +376,30 @@ class CloudSyncService extends ChangeNotifier {
 
   Future<void> _runSynchronize({
     required int runToken,
+    required String namespace,
     required bool restoreFirst,
     Future<void> Function(String collection)? onCollectionRestored,
   }) async {
+    if (!_isActiveRun(runToken, namespace)) return;
     await _ensureUserProfile();
-    if (_runToken != runToken) return;
+    if (!_isActiveRun(runToken, namespace)) return;
     var restoredAny = false;
     if (restoreFirst) {
       restoredAny = await _restoreAll(
         runToken: runToken,
+        namespace: namespace,
         onCollectionRestored: onCollectionRestored,
       );
-      if (_runToken != runToken) return;
+      if (!_isActiveRun(runToken, namespace)) return;
       await _enqueueLocalSnapshot();
     }
-    if (_runToken != runToken) return;
-    await flushQueue();
-    if (_runToken != runToken) return;
+    if (!_isActiveRun(runToken, namespace)) return;
+    await _flushQueue(expectedNamespace: namespace);
+    if (!_isActiveRun(runToken, namespace)) return;
 
     final syncedAt = DateTime.now();
     await _writeSyncMeta(syncedAt);
-    if (_runToken != runToken) return;
+    if (!_isActiveRun(runToken, namespace)) return;
     await _setState(
       _state.copyWith(
         phase: (await pendingCount()) > 0
@@ -332,12 +415,22 @@ class CloudSyncService extends ChangeNotifier {
   }
 
   Future<void> flushQueue() async {
+    await _flushQueue(expectedNamespace: _storage.activeNamespace);
+  }
+
+  Future<void> _flushQueue({String? expectedNamespace}) async {
     if (_currentUser == null) return;
     if (_isFlushingQueue) return;
+    final namespace = expectedNamespace ?? _storage.activeNamespace;
+    if (_storage.activeNamespace != namespace) return;
     _isFlushingQueue = true;
     final queue = await _storage.getSyncQueue();
     try {
       for (final item in queue) {
+        if (_storage.activeNamespace != namespace) {
+          debugPrint('[SYNC] flush aborted: namespace changed');
+          return;
+        }
         final normalizedCollection = _normalizeCollection(item.collection);
         if (!item.canRetry) continue;
         final collection = _userCollection(normalizedCollection);
@@ -383,6 +476,7 @@ class CloudSyncService extends ChangeNotifier {
 
   Future<bool> _restoreAll({
     required int runToken,
+    required String namespace,
     Future<void> Function(String collection)? onCollectionRestored,
   }) async {
     var restoredAny = false;
@@ -393,9 +487,10 @@ class CloudSyncService extends ChangeNotifier {
       final restored = await _restoreSafely(
         collection: collection,
         runToken: runToken,
+        namespace: namespace,
         body: body,
       );
-      if (_runToken == runToken && restored) {
+      if (_isActiveRun(runToken, namespace) && restored) {
         restoredAny = true;
         await onCollectionRestored?.call(collection);
       }
@@ -418,13 +513,14 @@ class CloudSyncService extends ChangeNotifier {
   Future<bool> _restoreSafely({
     required String collection,
     required int runToken,
+    required String namespace,
     required Future<void> Function() body,
   }) async {
-    if (_runToken != runToken) return false;
+    if (!_isActiveRun(runToken, namespace)) return false;
     try {
       debugPrint('[CloudSyncService] restore start: $collection');
       await body().timeout(collectionTimeout);
-      if (_runToken != runToken) {
+      if (!_isActiveRun(runToken, namespace)) {
         return false;
       }
       debugPrint('[CloudSyncService] restore complete: $collection');
@@ -699,16 +795,21 @@ class CloudSyncService extends ChangeNotifier {
   }
 
   Future<void> _enqueueLocalSnapshot() async {
+    final namespace = _storage.activeNamespace;
     for (final log in await _storage.getStudyLogs()) {
+      if (_storage.activeNamespace != namespace) return;
       await enqueueStudyLog(log);
     }
     for (final event in await _storage.getStudyEvents()) {
+      if (_storage.activeNamespace != namespace) return;
       await enqueueStudyEvent(event);
     }
     for (final goal in await _storage.getStudyGoals()) {
+      if (_storage.activeNamespace != namespace) return;
       await enqueueGoal(goal);
     }
     for (final certificate in await _storage.getCertificates()) {
+      if (_storage.activeNamespace != namespace) return;
       await enqueueCertificate(certificate);
     }
     await enqueueSettings(await _storage.getCloudSettingsSnapshot());
@@ -800,12 +901,35 @@ class CloudSyncService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _deleteCollection(
+    CollectionReference<Map<String, dynamic>> collection,
+  ) async {
+    while (true) {
+      final snapshot = await collection.limit(100).get().timeout(writeTimeout);
+      if (snapshot.docs.isEmpty) return;
+      final batch = FirebaseFirestore.instance.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit().timeout(writeTimeout);
+    }
+  }
+
   String _normalizeCollection(String collection) {
     return switch (collection) {
       CloudCollections.records => CloudCollections.studyLogs,
       CloudCollections.legacyAchievements => CloudCollections.certificates,
       _ => collection,
     };
+  }
+
+  bool _isActiveRun(int runToken, String namespace) {
+    final active =
+        _runToken == runToken && _storage.activeNamespace == namespace;
+    if (!active) {
+      debugPrint('[SYNC] run aborted: namespace changed');
+    }
+    return active;
   }
 
   Map<String, dynamic> _firestoreSafeMap(Map<String, dynamic> map) {

@@ -23,6 +23,7 @@ import 'package:study_hub/screens/home/create_goal_sheet.dart';
 import 'package:study_hub/screens/settings/settings_screen.dart';
 import 'package:study_hub/screens/study_log/study_log_screen.dart';
 import 'package:study_hub/services/local_study_schema_service.dart';
+import 'package:study_hub/services/storage_service.dart';
 import 'package:study_hub/widgets/dynamic_form_builder.dart';
 import 'package:study_hub/widgets/notion_connection_sheet.dart';
 
@@ -34,7 +35,8 @@ void main() {
   );
   final secureValues = <String, String>{};
 
-  setUp(() {
+  setUp(() async {
+    await StorageService().useGuestNamespace();
     secureValues.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageChannel, (call) async {
@@ -218,9 +220,8 @@ void main() {
   });
 
   test('Settings persists and loads register field source', () async {
-    SharedPreferences.setMockInitialValues({
-      'register_field_source': RegisterFieldSource.notion.name,
-    });
+    SharedPreferences.setMockInitialValues({});
+    await StorageService().saveRegisterFieldSource(RegisterFieldSource.notion);
     final settings = SettingsProvider();
 
     await settings.loadSettings();
@@ -306,15 +307,14 @@ void main() {
   testWidgets('Register shows Notion fields when notion source is active', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({
-      'app_notion_authenticated': true,
-      'app_notion_database_id': 'db-123',
-      'notion_cached_schema':
-          '{"properties":{"Titulo":{"id":"title","type":"title"},"Tempo":{"id":"time","type":"number"},"Notas":{"id":"notes","type":"rich_text"}}}',
-      'register_field_source': RegisterFieldSource.notion.name,
-    });
-    secureValues['notion_token'] = 'secret-token';
-    secureValues['notion_database_id'] = 'db-123';
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    await storage.saveNotionToken('secret-token');
+    await storage.saveNotionDatabaseId('db-123');
+    await storage.saveNotionSchema(
+      '{"properties":{"Titulo":{"id":"title","type":"title"},"Tempo":{"id":"time","type":"number"},"Notas":{"id":"notes","type":"rich_text"}}}',
+    );
+    await storage.saveRegisterFieldSource(RegisterFieldSource.notion);
     final settings = SettingsProvider();
     final logs = StudyLogProvider();
     await settings.loadSettings();
@@ -345,15 +345,14 @@ void main() {
   testWidgets('Register stores notes while using Notion Sync source', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({
-      'app_notion_authenticated': true,
-      'app_notion_database_id': 'db-123',
-      'notion_cached_schema':
-          '{"properties":{"Titulo":{"id":"title","type":"title"},"Tempo":{"id":"time","type":"number"}}}',
-      'register_field_source': RegisterFieldSource.notion.name,
-    });
-    secureValues['notion_token'] = 'secret-token';
-    secureValues['notion_database_id'] = 'db-123';
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    await storage.saveNotionToken('secret-token');
+    await storage.saveNotionDatabaseId('db-123');
+    await storage.saveNotionSchema(
+      '{"properties":{"Titulo":{"id":"title","type":"title"},"Tempo":{"id":"time","type":"number"}}}',
+    );
+    await storage.saveRegisterFieldSource(RegisterFieldSource.notion);
     final settings = SettingsProvider();
     final logs = StudyLogProvider();
     await settings.loadSettings();
@@ -375,7 +374,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    secureValues.remove('notion_token');
+    await StorageService().saveNotionToken('');
 
     await tester.tap(find.byTooltip('Notas de estudo'));
     await tester.pumpAndSettle();
@@ -472,15 +471,14 @@ void main() {
   testWidgets('Register source switch keeps local and Notion drafts separate', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({
-      'app_notion_authenticated': true,
-      'app_notion_database_id': 'db-123',
-      'notion_cached_schema':
-          '{"properties":{"Titulo":{"id":"title","type":"title"},"Categoria":{"id":"notion-category","type":"select","select":{"options":[{"name":"Notion"}]}},"Tempo":{"id":"time","type":"number"}}}',
-      'register_field_source': RegisterFieldSource.local.name,
-    });
-    secureValues['notion_token'] = 'secret-token';
-    secureValues['notion_database_id'] = 'db-123';
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    await storage.saveNotionToken('secret-token');
+    await storage.saveNotionDatabaseId('db-123');
+    await storage.saveNotionSchema(
+      '{"properties":{"Titulo":{"id":"title","type":"title"},"Categoria":{"id":"notion-category","type":"select","select":{"options":[{"name":"Notion"}]}},"Tempo":{"id":"time","type":"number"}}}',
+    );
+    await storage.saveRegisterFieldSource(RegisterFieldSource.local);
     final settings = SettingsProvider();
     final logs = StudyLogProvider();
     await settings.loadSettings();
@@ -558,16 +556,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Token de integracao'), findsOneWidget);
+    expect(find.text('Token de integração'), findsOneWidget);
     expect(find.text('Database ID'), findsOneWidget);
     expect(find.text('Salvar e sincronizar tabela'), findsOneWidget);
-    expect(find.text('Testar conexao'), findsOneWidget);
+    expect(find.text('Testar conexão'), findsOneWidget);
     expect(
-      find.textContaining('Nao foi possivel carregar credenciais salvas'),
+      find.textContaining('Não foi possível carregar credenciais salvas'),
       findsNothing,
     );
     expect(
-      find.textContaining('Informe o token da integracao'),
+      find.textContaining('Informe o token da integração'),
       findsOneWidget,
     );
   });
@@ -720,13 +718,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Como as materias da meta funcionam'), findsOneWidget);
+    expect(find.text('Como as matérias da meta funcionam'), findsOneWidget);
     await tester.tap(find.text('Entendi'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Como as materias da meta funcionam'), findsNothing);
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getBool('goal_tutorial_seen'), isTrue);
+    expect(find.text('Como as matérias da meta funcionam'), findsNothing);
+    expect(await StorageService().hasSeenGoalTutorial(), isTrue);
   });
 
   testWidgets(
@@ -753,9 +750,9 @@ void main() {
       expect(find.text('Notion'), findsOneWidget);
       expect(find.text('Tabela local'), findsOneWidget);
       expect(find.byType(SvgPicture), findsNWidgets(2));
-      expect(find.text('Token de integracao'), findsNothing);
+      expect(find.text('Token de integração'), findsNothing);
       expect(find.text('Database ID'), findsNothing);
-      expect(find.text('Historico de registros'), findsOneWidget);
+      expect(find.text('Histórico de registros'), findsOneWidget);
     },
   );
 }

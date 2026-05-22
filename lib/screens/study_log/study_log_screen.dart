@@ -107,7 +107,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
             : null,
         actions: [
           IconButton(
-            tooltip: 'Historico',
+            tooltip: 'Histórico',
             onPressed: _openHistory,
             icon: const Icon(Icons.history_rounded),
           ),
@@ -246,7 +246,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
         setState(() => _isSaving = false);
         SnackbarHelper.showError(
           context,
-          'Nao foi possivel carregar os campos do Notion.',
+          'Não foi possível carregar os campos do Notion.',
         );
         return;
       }
@@ -299,7 +299,7 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
     setState(() => _isSaving = false);
 
     if (!saved) {
-      SnackbarHelper.showError(context, 'Nao foi possivel salvar localmente.');
+      SnackbarHelper.showError(context, 'Não foi possível salvar localmente.');
       return;
     }
 
@@ -882,10 +882,10 @@ class _StudyLogScreenState extends State<StudyLogScreen> {
         _notionSchemaWarning = null;
       } else if (hadCachedSchema || hasSchema) {
         _notionSchemaWarning =
-            'Nao foi possivel atualizar a tabela agora. Campos em cache continuam visiveis.';
+            'Não foi possível atualizar a tabela agora. Campos em cache continuam visíveis.';
       } else {
         _notionSchemaError =
-            'Nao foi possivel sincronizar os campos da tabela do Notion.';
+            'Não foi possível sincronizar os campos da tabela do Notion.';
       }
     });
   }
@@ -979,7 +979,7 @@ class _RegisterHeader extends StatelessWidget {
                         ? 'Ative o Notion Sync para carregar a estrutura da tabela.'
                         : selectedSource == RegisterFieldSource.local
                         ? 'O modo selecionado controla quais campos aparecem no registro.'
-                        : 'Campos em cache serao atualizados automaticamente quando possivel.'),
+                        : 'Campos em cache serão atualizados automaticamente quando possível.'),
           style: context.theme.textTheme.bodySmall?.copyWith(
             color: schemaWarning != null
                 ? context.colors.warning

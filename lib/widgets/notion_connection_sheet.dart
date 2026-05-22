@@ -73,7 +73,7 @@ class _NotionConnectionSheetState extends State<NotionConnectionSheet> {
       if (!mounted) return;
       setState(() {
         _loadWarning =
-            'Nao foi possivel carregar credenciais salvas. Voce ainda pode preencher os campos manualmente.';
+            'Não foi possível carregar credenciais salvas. Você ainda pode preencher os campos manualmente.';
       });
     }
   }
@@ -125,7 +125,7 @@ class _NotionConnectionSheetState extends State<NotionConnectionSheet> {
               SizedBox(height: spacing.md),
             ],
             CustomTextField(
-              label: 'Token de integracao',
+              label: 'Token de integração',
               hint: 'ntn_xxxxxxxxxxxx...',
               prefixIcon: Icons.key_rounded,
               controller: _tokenController,
@@ -147,7 +147,7 @@ class _NotionConnectionSheetState extends State<NotionConnectionSheet> {
             ),
             SizedBox(height: spacing.sm),
             CustomButton(
-              label: 'Testar conexao',
+              label: 'Testar conexão',
               icon: Icons.wifi_tethering_rounded,
               isOutlined: true,
               color: context.colors.accentSecondary,
@@ -212,7 +212,7 @@ class _NotionConnectionSheetState extends State<NotionConnectionSheet> {
       if (mounted) {
         SnackbarHelper.showError(
           context,
-          'Nao foi possivel salvar ou sincronizar o Notion.',
+          'Não foi possível salvar ou sincronizar o Notion.',
         );
       }
     } finally {
@@ -239,14 +239,14 @@ class _NotionConnectionSheetState extends State<NotionConnectionSheet> {
         AppHaptics.success();
         SnackbarHelper.showSuccess(context, 'Conexao com o Notion validada.');
       } else {
-        SnackbarHelper.showError(context, 'Falha na conexao com o Notion.');
+        SnackbarHelper.showError(context, 'Falha na conexão com o Notion.');
       }
     } catch (e) {
       debugPrint('[NotionConnectionSheet] Connection test failed: $e');
       if (mounted) {
         SnackbarHelper.showError(
           context,
-          'Erro ao testar conexao com o Notion.',
+          'Erro ao testar conexão com o Notion.',
         );
       }
     } finally {
@@ -276,7 +276,7 @@ class _NotionConnectionSheetState extends State<NotionConnectionSheet> {
       if (mounted) {
         SnackbarHelper.showError(
           context,
-          'Nao foi possivel desconectar o Notion.',
+          'Não foi possível desconectar o Notion.',
         );
       }
     } finally {
@@ -302,7 +302,7 @@ class _CredentialLoadWarning extends StatelessWidget {
           SizedBox(width: context.spacing.sm),
           Expanded(
             child: Text(
-              message ?? 'Nao foi possivel carregar as credenciais salvas.',
+              message ?? 'Não foi possível carregar as credenciais salvas.',
               style: context.theme.textTheme.bodySmall,
             ),
           ),
@@ -329,7 +329,7 @@ class _CredentialHelper extends StatelessWidget {
           SizedBox(width: context.spacing.sm),
           Expanded(
             child: Text(
-              'Informe o token da integracao e o Database ID para testar ou salvar a conexao.',
+              'Informe o token da integração e o Database ID para testar ou salvar a conexão.',
               style: context.theme.textTheme.bodySmall,
             ),
           ),

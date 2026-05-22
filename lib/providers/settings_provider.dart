@@ -47,12 +47,14 @@ class SettingsProvider extends ChangeNotifier {
         themeMode = 'light';
         await _storage.saveThemeMode(themeMode);
       }
+      debugPrint('[THEME] loaded $themeMode');
       final defaultReminder = await _storage.getDefaultReminder();
       final timeField = await _storage.getNotionTimeField();
       final localTimeField =
           await _storage.getLocalTimeField() ??
           LocalStudySchemaService.defaultStudyTimeField;
       final storedRegisterFieldSource = await _storage.getRegisterFieldSource();
+      final onboarding = await _storage.getOnboardingState();
 
       final isNotionAuthenticated =
           (notionToken != null && notionToken.isNotEmpty) || notionAuthFlag;
@@ -82,6 +84,19 @@ class SettingsProvider extends ChangeNotifier {
         linkCategoriesToNotion: await _storage.getLinkCategoriesToNotion(),
         notionCategoryField: await _storage.getNotionCategoryField(),
         registerFieldSource: registerFieldSource,
+        onboardingCompleted: onboarding.onboardingCompleted,
+        onboardingVersion: onboarding.onboardingVersion,
+        profilePersonalizationCompleted:
+            onboarding.profilePersonalizationCompleted,
+        starterSubjectsSeeded: onboarding.starterSubjectsSeeded,
+        legacyMigrationCompleted: onboarding.legacyMigrationCompleted,
+        contextualGuideCompleted: onboarding.contextualGuideCompleted,
+        selectedStudyProfileId: onboarding.selectedStudyProfileId,
+        selectedStudyProfileLabel: onboarding.selectedStudyProfileLabel,
+        selectedStudyFocusId: onboarding.selectedStudyFocusId,
+        selectedStudyFocusLabel: onboarding.selectedStudyFocusLabel,
+        lumaPersonalizationEnabled: await _storage
+            .getLumaPersonalizationEnabled(),
       );
     } catch (e) {
       debugPrint('Error loading settings: $e');
@@ -260,10 +275,24 @@ class SettingsProvider extends ChangeNotifier {
 
   /// Updates the theme mode (light, dark).
   Future<void> setThemeMode(String mode) async {
-    _settings = _settings.copyWith(themeMode: mode);
+    final normalized = mode == 'dark' ? 'dark' : 'light';
+    debugPrint('[THEME] changed $normalized');
+    await _storage.saveThemeMode(normalized);
+    debugPrint('[THEME] saved $normalized');
+    _settings = _settings.copyWith(themeMode: normalized);
     notifyListeners();
-    await _storage.saveThemeMode(mode);
+    try {
+      await _queueSettingsSync();
+    } catch (e) {
+      debugPrint('Theme settings sync queue failed: $e');
+    }
+  }
+
+  Future<void> setLumaPersonalizationEnabled(bool value) async {
+    await _storage.saveLumaPersonalizationEnabled(value);
+    _settings = _settings.copyWith(lumaPersonalizationEnabled: value);
     await _queueSettingsSync();
+    notifyListeners();
   }
 
   /// Saves the mapping for the study time field.

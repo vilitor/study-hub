@@ -5,8 +5,12 @@ import 'package:study_hub/config/app_theme.dart';
 import 'package:study_hub/models/auth_session.dart';
 import 'package:study_hub/models/cloud_sync.dart';
 import 'package:study_hub/providers/auth_session_provider.dart';
+import 'package:study_hub/providers/contextual_guide_provider.dart';
+import 'package:study_hub/providers/onboarding_provider.dart';
 import 'package:study_hub/providers/settings_provider.dart';
+import 'package:study_hub/providers/update_provider.dart';
 import 'package:study_hub/screens/settings/privacy_policy_screen.dart';
+import 'package:study_hub/services/app_account_deletion_service.dart';
 import 'package:study_hub/services/app_haptics.dart';
 import 'package:study_hub/services/cloud_sync_service.dart';
 import 'package:study_hub/utils/snackbar_helper.dart';
@@ -16,16 +20,26 @@ import 'package:study_hub/widgets/custom_button.dart';
 import 'package:study_hub/widgets/integration_button.dart';
 import 'package:study_hub/widgets/local_table_schema_sheet.dart';
 import 'package:study_hub/widgets/notion_connection_sheet.dart';
+import 'package:study_hub/widgets/update_available_dialog.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final AppAccountDeletionService _accountDeletion =
+      AppAccountDeletionService();
+  bool _isDeletingAccount = false;
 
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuracoes'),
+        title: const Text('Configurações'),
         leading: Navigator.canPop(context)
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
@@ -49,6 +63,13 @@ class SettingsScreen extends StatelessWidget {
             syncState = const CloudSyncState();
           }
 
+          UpdateProvider? updates;
+          try {
+            updates = context.watch<UpdateProvider>();
+          } on ProviderNotFoundException {
+            updates = null;
+          }
+
           final googleConnected =
               settings.isGoogleConnected || (auth?.isSignedIn ?? false);
           final googleEmail = auth?.email ?? settings.settings.googleEmail;
@@ -68,7 +89,7 @@ class SettingsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AppSectionHeader(
-                  title: 'Integracoes',
+                  title: 'Integrações',
                   subtitle:
                       'Gerencie Google Calendar e Notion sem poluir o app.',
                 ),
@@ -124,7 +145,7 @@ class SettingsScreen extends StatelessWidget {
                       Icons.history_rounded,
                       color: context.colors.accent,
                     ),
-                    title: const Text('Historico de registros'),
+                    title: const Text('Histórico de registros'),
                     subtitle: const Text(
                       'Ver, editar notas e excluir registros.',
                     ),
@@ -132,6 +153,33 @@ class SettingsScreen extends StatelessWidget {
                     onTap: () {
                       AppHaptics.selection();
                       Navigator.pushNamed(context, AppRoutes.history);
+                    },
+                  ),
+                ),
+                SizedBox(height: spacing.sm),
+                AppSurface(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.tips_and_updates_rounded,
+                      color: context.colors.accentSecondary,
+                    ),
+                    title: const Text('Rever guia rápido'),
+                    subtitle: const Text(
+                      'Mostra novamente orientações contextuais do app.',
+                    ),
+                    trailing: const Icon(Icons.replay_rounded),
+                    onTap: () async {
+                      AppHaptics.selection();
+                      await context
+                          .read<OnboardingProvider>()
+                          .replayContextualGuide();
+                      if (!context.mounted) return;
+                      context.read<ContextualGuideProvider>().reset();
+                      SnackbarHelper.showSuccess(
+                        context,
+                        'Guia rápido reativado.',
+                      );
                     },
                   ),
                 ),
@@ -167,7 +215,68 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (updates != null) ...[
+                  SizedBox(height: spacing.sectionGap),
+                  const AppSectionHeader(
+                    title: 'Atualizações',
+                    subtitle: 'Verifique novas versões do StudyHub.',
+                  ),
+                  SizedBox(height: spacing.md),
+                  AppSurface(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        Icons.system_update_alt_rounded,
+                        color: context.colors.accent,
+                      ),
+                      title: const Text('Verificar atualizações'),
+                      subtitle: Text(
+                        'Instalada: ${updates.installedVersionLabel} | ${updates.statusLabel}',
+                      ),
+                      trailing: updates.isChecking
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: context.colors.accent,
+                              ),
+                            )
+                          : const Icon(Icons.refresh_rounded),
+                      onTap: updates.isChecking || updates.isDownloading
+                          ? null
+                          : () => _handleManualUpdateCheck(context, updates!),
+                    ),
+                  ),
+                ],
                 SizedBox(height: spacing.sectionGap),
+                AppSurface(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.delete_forever_rounded,
+                      color: context.colors.error,
+                    ),
+                    title: const Text('Excluir conta do app'),
+                    subtitle: const Text(
+                      'Remove os dados do Study Hub neste dispositivo e, quando houver login, também no backup Firebase.',
+                    ),
+                    trailing: _isDeletingAccount
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: context.colors.error,
+                            ),
+                          )
+                        : const Icon(Icons.arrow_forward_rounded),
+                    onTap: _isDeletingAccount
+                        ? null
+                        : () => _showDeleteAccountFlow(context, auth),
+                  ),
+                ),
+                SizedBox(height: spacing.sm),
                 AppSurface(
                   child: Column(
                     children: [
@@ -179,11 +288,13 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ),
                         icon: const Icon(Icons.privacy_tip_rounded),
-                        label: const Text('Privacidade e seguranca dos dados'),
+                        label: const Text('Privacidade e segurança dos dados'),
                       ),
                       SizedBox(height: spacing.sm),
                       Text(
-                        'StudyHub v1.1.0',
+                        updates == null
+                            ? 'StudyHub'
+                            : 'StudyHub v${updates.installedVersionLabel}',
                         style: context.theme.textTheme.bodySmall,
                       ),
                     ],
@@ -194,6 +305,128 @@ class SettingsScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  Future<void> _handleManualUpdateCheck(
+    BuildContext context,
+    UpdateProvider updates,
+  ) async {
+    AppHaptics.selection();
+    final hasUpdate = await updates.checkForUpdate(manual: true);
+    if (!context.mounted) return;
+
+    if (hasUpdate) {
+      await UpdateAvailableDialog.show(context);
+      return;
+    }
+
+    if (updates.status == UpdateStatus.upToDate) {
+      SnackbarHelper.showSuccess(context, 'StudyHub já está atualizado.');
+    } else {
+      SnackbarHelper.showError(
+        context,
+        updates.errorMessage ?? 'Não foi possível verificar atualizações.',
+      );
+    }
+  }
+
+  Future<void> _showDeleteAccountFlow(
+    BuildContext context,
+    AuthSessionProvider? auth,
+  ) async {
+    AppHaptics.warning();
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Excluir conta do app?'),
+          content: const Text(
+            'Esta ação excluirá os dados da sua conta no Study Hub. Ela não exclui sua Conta Google, sua conta Notion nem eventos externos do Google Calendar.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Continuar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (proceed != true || !context.mounted) return;
+
+    final confirmed = await _showFinalDeleteConfirmation(context);
+    if (confirmed != true || !context.mounted) return;
+
+    setState(() => _isDeletingAccount = true);
+    try {
+      await _accountDeletion.deleteAppAccount(
+        isGuest: auth?.isGuest ?? true,
+        uid: auth?.uid,
+      );
+      await auth?.resetAfterAccountDeletion();
+      if (!context.mounted) return;
+      await context.read<SettingsProvider>().loadSettings();
+      if (!context.mounted) return;
+      SnackbarHelper.showSuccess(context, 'Conta do app excluída.');
+    } catch (e) {
+      if (!context.mounted) return;
+      SnackbarHelper.showError(
+        context,
+        'Não foi possível excluir a conta do app. Verifique a conexão e tente novamente.',
+      );
+    } finally {
+      if (mounted) setState(() => _isDeletingAccount = false);
+    }
+  }
+
+  Future<bool?> _showFinalDeleteConfirmation(BuildContext context) {
+    var typed = '';
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final canDelete = typed.trim().toUpperCase() == 'EXCLUIR';
+            return AlertDialog(
+              title: const Text('Confirmação necessária'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Para confirmar, digite EXCLUIR. Dados sincronizados do Study Hub podem ser removidos do Firebase.',
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Digite EXCLUIR',
+                    ),
+                    onChanged: (value) => setDialogState(() => typed = value),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: canDelete
+                      ? () => Navigator.pop(dialogContext, true)
+                      : null,
+                  child: const Text('Excluir conta do app'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -313,17 +546,17 @@ class _CloudSyncStatusTile extends StatelessWidget {
     final subtitle = switch (syncState.phase) {
       CloudSyncPhase.syncing => 'Sincronizando backup Firebase...',
       CloudSyncPhase.offline =>
-        'Modo offline ativo. ${syncState.pendingCount} alteracao(oes) pendente(s).',
+        'Modo offline ativo. ${syncState.pendingCount} alteração(ões) pendente(s).',
       CloudSyncPhase.timeout =>
         'Sync demorou demais. O app continua funcionando localmente.',
       CloudSyncPhase.error =>
         'Falha no sync. ${syncState.pendingCount} item(ns) pendente(s).',
       CloudSyncPhase.pending =>
-        '${syncState.pendingCount} alteracao(oes) aguardando envio.',
+        '${syncState.pendingCount} alteração(ões) aguardando envio.',
       _ when syncState.pendingCount > 0 =>
-        '${syncState.pendingCount} item(ns) aguardando conexao.',
+        '${syncState.pendingCount} item(ns) aguardando conexão.',
       _ when syncState.lastSyncedAt != null =>
-        'Ultimo backup: ${_formatLastSync(syncState.lastSyncedAt!)}',
+        'Último backup: ${_formatLastSync(syncState.lastSyncedAt!)}',
       _ => 'Backup Firebase pronto para restaurar seus dados.',
     };
 

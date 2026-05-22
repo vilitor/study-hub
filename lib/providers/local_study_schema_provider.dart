@@ -5,6 +5,7 @@ import 'package:study_hub/models/local_study_field.dart';
 import 'package:study_hub/services/cloud_sync_service.dart';
 import 'package:study_hub/services/local_study_schema_service.dart';
 import 'package:study_hub/services/storage_service.dart';
+import 'package:study_hub/services/study_profile_catalog.dart';
 
 class LocalStudySchemaProvider extends ChangeNotifier {
   final StorageService _storage = StorageService();
@@ -13,8 +14,10 @@ class LocalStudySchemaProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _lastError;
 
-  LocalStudySchemaProvider() {
-    loadFields();
+  LocalStudySchemaProvider({bool autoLoad = true}) {
+    if (autoLoad) {
+      loadFields();
+    }
   }
 
   List<LocalStudyField> get fields => List.unmodifiable(_fields);
@@ -23,7 +26,12 @@ class LocalStudySchemaProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
 
-  Future<void> loadFields() async {
+  Future<void> loadFields({
+    List<String> defaultCategories = const [],
+    bool useFallbackCategories = true,
+    bool refreshDefaultCategoryOptions = false,
+    bool persistDefaultFields = true,
+  }) async {
     _setLoading(true);
     try {
       _lastError = null;
@@ -31,22 +39,105 @@ class LocalStudySchemaProvider extends ChangeNotifier {
       _fields
         ..clear()
         ..addAll(
-          stored.isEmpty ? LocalStudySchemaService.defaultFields() : stored,
+          stored.isEmpty
+              ? LocalStudySchemaService.defaultFields(
+                  categories: defaultCategories,
+                  useFallbackCategories: useFallbackCategories,
+                )
+              : _fieldsWithProfileCategoriesIfSafe(
+                  stored,
+                  defaultCategories,
+                  refreshDefaultCategoryOptions,
+                ),
         );
-      if (stored.isEmpty) {
+      if (stored.isEmpty && persistDefaultFields) {
+        await _storage.saveLocalStudyFields(_fields);
+      } else if (refreshDefaultCategoryOptions &&
+          !_sameFields(stored, _fields)) {
         await _storage.saveLocalStudyFields(_fields);
       }
     } catch (e) {
-      _lastError = 'Nao foi possivel carregar a tabela local.';
+      _lastError = 'Não foi possível carregar a tabela local.';
       debugPrint('[LocalStudySchemaProvider] loadFields failed: $e');
     } finally {
       _setLoading(false);
     }
   }
 
+  List<LocalStudyField> _fieldsWithProfileCategoriesIfSafe(
+    List<LocalStudyField> fields,
+    List<String> categories,
+    bool enabled,
+  ) {
+    if (!enabled) return fields;
+    final index = fields.indexWhere((field) => field.id == 'local_category');
+    if (index == -1) return fields;
+
+    final field = fields[index];
+    if (!field.isDefault ||
+        field.isArchived ||
+        field.type != LocalStudyFieldType.select ||
+        !_canReplaceOptions(field.options)) {
+      return fields;
+    }
+
+    final nextOptions = _dedupe(categories);
+    if (_sameOptions(field.options, nextOptions)) return fields;
+
+    final next = List<LocalStudyField>.from(fields);
+    next[index] = field.copyWith(
+      options: nextOptions,
+      updatedAt: DateTime.now(),
+    );
+    return next;
+  }
+
+  bool _canReplaceOptions(List<String> options) {
+    if (options.isEmpty) return true;
+    final safeOptions = {
+      ...LocalStudySchemaService.fallbackCategoryOptions,
+      ...const StudyProfileCatalog().allStarterSubjects(),
+    }.map((value) => value.toLowerCase()).toSet();
+    return options.every(
+      (option) => safeOptions.contains(option.toLowerCase()),
+    );
+  }
+
+  List<String> _dedupe(List<String> values) {
+    final result = <String>[];
+    final seen = <String>{};
+    for (final value in values) {
+      final trimmed = value.trim();
+      final key = trimmed.toLowerCase();
+      if (trimmed.isEmpty || seen.contains(key)) continue;
+      seen.add(key);
+      result.add(trimmed);
+    }
+    return result;
+  }
+
+  bool _sameOptions(List<String> left, List<String> right) {
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i].toLowerCase() != right[i].toLowerCase()) return false;
+    }
+    return true;
+  }
+
+  bool _sameFields(List<LocalStudyField> left, List<LocalStudyField> right) {
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i].id != right[i].id ||
+          !_sameOptions(left[i].options, right[i].options)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<bool> addField(LocalStudyField field) async {
     if (_hasDuplicateLabel(field.label)) {
-      _lastError = 'Ja existe um campo ativo com esse nome.';
+      _lastError = 'Já existe um campo ativo com esse nome.';
       notifyListeners();
       return false;
     }
@@ -58,7 +149,7 @@ class LocalStudySchemaProvider extends ChangeNotifier {
     final index = _fields.indexWhere((item) => item.id == field.id);
     if (index == -1) return false;
     if (_hasDuplicateLabel(field.label, exceptId: field.id)) {
-      _lastError = 'Ja existe um campo ativo com esse nome.';
+      _lastError = 'Já existe um campo ativo com esse nome.';
       notifyListeners();
       return false;
     }
@@ -74,7 +165,7 @@ class LocalStudySchemaProvider extends ChangeNotifier {
     if (index == -1) return false;
     final field = _fields[index];
     if (field.label == protectedTimeField || field.isRequired) {
-      _lastError = 'Este campo e necessario para os registros.';
+      _lastError = 'Este campo é necessário para os registros.';
       notifyListeners();
       return false;
     }
@@ -110,7 +201,7 @@ class LocalStudySchemaProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _lastError = 'Nao foi possivel salvar a tabela local.';
+      _lastError = 'Não foi possível salvar a tabela local.';
       debugPrint('[LocalStudySchemaProvider] persist failed: $e');
       notifyListeners();
       return false;

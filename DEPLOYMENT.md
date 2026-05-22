@@ -82,6 +82,56 @@ The release build requires the manually copied keystore and
 `android/key.properties`. If either file is missing, Gradle should fail before
 producing an unsigned or incorrectly signed release artifact.
 
+## GitHub Releases App Updates
+
+StudyHub Android updates are distributed through public GitHub Releases. The app
+checks:
+
+```text
+https://api.github.com/repos/vilitor/study-hub/releases/latest
+```
+
+Release requirements:
+
+- Use stable semantic tags only: `v1.0.0`, `v1.0.1`, `v1.1.0`.
+- Do not use prerelease tags such as `v1.1.0-beta`.
+- Upload a signed release APK asset. Recommended name:
+  `studyhub-vX.Y.Z-release.apk`.
+- Sign every future APK with the same release keystore. Android only preserves
+  app data, Firebase/Auth state, Firestore cache, and local storage when the
+  package name and signing certificate remain the same.
+
+Release process:
+
+```bash
+flutter pub get
+flutter test
+flutter build apk --release
+```
+
+Then in GitHub:
+
+1. Bump `pubspec.yaml` to the new version, for example `1.0.4+5`.
+2. Create tag `v1.0.4`.
+3. Create a normal GitHub Release for that tag.
+4. Upload `build/app/outputs/flutter-apk/app-release.apk` as
+   `studyhub-v1.0.4-release.apk`.
+5. Publish the release.
+
+The app will detect the new release automatically on the next startup/session or
+when the user opens Settings -> Verificar atualizacoes.
+
+Manual validation before announcing a release:
+
+- Install the previous signed release APK.
+- Confirm local data, Firebase Auth, Firestore sync cache, settings, and stored
+  study history are present.
+- Publish a newer GitHub Release with a higher `vX.Y.Z` tag.
+- Open the app and confirm the update dialog appears without blocking startup.
+- Download the update, confirm progress/cancel behavior, and install through
+  the Android package installer.
+- Reopen StudyHub and confirm data/Auth persistence after the upgrade.
+
 ## Firebase CLI Commands
 
 On this Windows environment, run Firebase CLI through `npx.cmd firebase ...`.

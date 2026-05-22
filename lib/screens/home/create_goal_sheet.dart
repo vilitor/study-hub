@@ -202,15 +202,35 @@ class _CreateGoalSheetState extends State<CreateGoalSheet> {
               keyboardType: TextInputType.number,
             ),
             SizedBox(height: spacing.xl),
-            AppMultiSelectField(
-              title: 'Linguagens / Matérias',
-              helperText: 'Se vazio, contabiliza todo o tempo de estudo.',
-              options: _availableLanguages,
-              selectedValues: _selectedLanguages,
-              enableSearch: _availableLanguages.length >= 8,
-              onChanged: (values) =>
-                  setState(() => _selectedLanguages = values),
-            ),
+            if (_availableLanguages.isEmpty)
+              AppSurface.subtle(
+                padding: EdgeInsets.all(spacing.md),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: colors.accent,
+                    ),
+                    SizedBox(width: spacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Nenhuma matéria cadastrada ainda. A meta pode contar todo o tempo, ou você pode adicionar matérias em Agenda > Matérias.',
+                        style: context.theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              AppMultiSelectField(
+                title: 'Linguagens / Matérias',
+                helperText: 'Se vazio, contabiliza todo o tempo de estudo.',
+                options: _availableLanguages,
+                selectedValues: _selectedLanguages,
+                enableSearch: _availableLanguages.length >= 8,
+                onChanged: (values) =>
+                    setState(() => _selectedLanguages = values),
+              ),
             SizedBox(height: spacing.xxl),
             Row(
               children: [
@@ -269,7 +289,7 @@ class _GoalTutorialCard extends StatelessWidget {
               SizedBox(width: spacing.md),
               Expanded(
                 child: Text(
-                  'Como as materias da meta funcionam',
+                  'Como as matérias da meta funcionam',
                   style: context.theme.textTheme.titleSmall,
                 ),
               ),
@@ -277,7 +297,7 @@ class _GoalTutorialCard extends StatelessWidget {
           ),
           SizedBox(height: spacing.md),
           Text(
-            'As materias usadas nas metas vêm das categorias da tela de Eventos. Para editar essa lista, abra Criar evento e use o icone de engrenagem no campo Matérias.',
+            'As matérias usadas nas metas vêm das categorias da tela de Eventos. Para editar essa lista, abra Criar evento e use o ícone de engrenagem no campo Matérias.',
             style: context.theme.textTheme.bodySmall,
           ),
           SizedBox(height: spacing.md),

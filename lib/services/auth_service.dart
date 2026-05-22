@@ -51,7 +51,6 @@ class GoogleFirebaseSignInResult {
 class AuthService {
   static const String serverClientId = AppConstants.googleWebClientId;
   static const List<String> calendarScopes = [
-    calendar.CalendarApi.calendarScope,
     calendar.CalendarApi.calendarEventsScope,
   ];
 
@@ -144,13 +143,29 @@ class AuthService {
   }
 
   Future<void> disconnect() async {
+    var googleSessionCleared = false;
     try {
+      await _googleSignIn.disconnect();
+      googleSessionCleared = true;
+      debugPrint('[AuthService] Google app session disconnected.');
+    } catch (e) {
+      debugPrint('[AuthService] Google disconnect failed, signing out: $e');
+      try {
+        await _googleSignIn.signOut();
+        googleSessionCleared = true;
+        debugPrint('[AuthService] Google local session signed out.');
+      } catch (signOutError) {
+        debugPrint(
+          '[AuthService] Google local sign-out fallback failed: $signOutError',
+        );
+      }
+    } finally {
       if (Firebase.apps.isNotEmpty) {
         await FirebaseAuth.instance.signOut();
       }
-      await _googleSignIn.disconnect();
-    } catch (e) {
-      debugPrint('[AuthService] Error during disconnect: $e');
+      debugPrint(
+        '[AuthService] disconnect complete googleSessionCleared=$googleSessionCleared',
+      );
     }
   }
 
@@ -168,14 +183,14 @@ class AuthService {
       if (error.code == 'operation-not-allowed') {
         return AuthDiagnostic(
           reason: AuthFailureReason.providerDisabled,
-          message: 'Google Sign-In esta desativado no Firebase Auth.',
+          message: 'Google Sign-In está desativado no Firebase Auth.',
           rawError: error,
         );
       }
       if (error.code == 'network-request-failed') {
         return AuthDiagnostic(
           reason: AuthFailureReason.network,
-          message: 'Falha de rede durante autenticacao.',
+          message: 'Falha de rede durante autenticação.',
           rawError: error,
         );
       }
@@ -208,7 +223,7 @@ class AuthService {
         return AuthDiagnostic(
           reason: AuthFailureReason.playServicesUnavailable,
           message:
-              'Google Play Services falhou ou nao esta disponivel para o login.',
+              'Google Play Services falhou ou não está disponível para o login.',
           manualAction:
               'Atualize o Google Play Services no dispositivo e teste novamente o APK release assinado.',
           rawError: error,
@@ -223,7 +238,7 @@ class AuthService {
         text.contains('client')) {
       return AuthDiagnostic(
         reason: AuthFailureReason.missingOAuthClient,
-        message: 'A configuracao OAuth Android/Firebase nao esta valida.',
+        message: 'A configuração OAuth Android/Firebase não está válida.',
         manualAction:
             'Valide SHA1/SHA256 do app com package com.victor.study_hub, baixe um google-services.json atualizado e reuse os clientes OAuth existentes.',
         rawError: error,
@@ -232,7 +247,7 @@ class AuthService {
     if (text.contains('network')) {
       return AuthDiagnostic(
         reason: AuthFailureReason.network,
-        message: 'Falha de rede durante autenticacao.',
+        message: 'Falha de rede durante autenticação.',
         rawError: error,
       );
     }
@@ -248,7 +263,7 @@ class AuthService {
     }
     return AuthDiagnostic(
       reason: AuthFailureReason.unknown,
-      message: 'Falha inesperada durante autenticacao Google/Firebase.',
+      message: 'Falha inesperada durante autenticação Google/Firebase.',
       rawError: error,
     );
   }
@@ -263,7 +278,7 @@ class AuthService {
         message:
             'Google Sign-In foi concluido, mas nenhum idToken foi retornado para o Firebase.',
         manualAction:
-            'Verifique se o Web OAuth client esta configurado como serverClientId e se o Android OAuth client existente corresponde ao package/signing SHA do APK release.',
+            'Verifique se o Web OAuth client está configurado como serverClientId e se o Android OAuth client existente corresponde ao package/signing SHA do APK release.',
       );
     }
 

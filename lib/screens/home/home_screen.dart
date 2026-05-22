@@ -18,6 +18,7 @@ import 'package:study_hub/widgets/app_modal.dart';
 import 'package:study_hub/widgets/app_surface.dart';
 import 'package:study_hub/widgets/certificate_widgets.dart';
 import 'package:study_hub/widgets/goal_card.dart';
+import 'package:study_hub/widgets/luma_recommendation_card.dart';
 import 'package:study_hub/widgets/streak_badge.dart';
 import 'package:study_hub/widgets/study_card.dart';
 import 'package:study_hub/widgets/weekly_calendar.dart';
@@ -43,6 +44,8 @@ class HomeScreen extends StatelessWidget {
               _HeaderSection(),
               SizedBox(height: spacing.sectionGap),
               _InsightsCard(),
+              SizedBox(height: spacing.sectionGap),
+              const LumaRecommendationCard(),
               SizedBox(height: spacing.sectionGap),
               _QuickStatsRow(),
               SizedBox(height: spacing.sectionGap),

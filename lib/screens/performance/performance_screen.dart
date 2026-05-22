@@ -8,6 +8,7 @@ import 'package:study_hub/providers/goal_provider.dart';
 import 'package:study_hub/providers/study_log_provider.dart';
 import 'package:study_hub/utils/date_helpers.dart';
 import 'package:study_hub/widgets/app_surface.dart';
+import 'package:study_hub/widgets/luma_recommendation_card.dart';
 import 'package:study_hub/widgets/study_heatmap.dart';
 
 class PerformanceScreen extends StatelessWidget {
@@ -45,6 +46,8 @@ class PerformanceScreen extends StatelessWidget {
                     subtitle:
                         'Insights e comparativos gerados a partir dos registros locais.',
                   ),
+                  SizedBox(height: spacing.sectionGap),
+                  const LumaRecommendationCard(title: 'Leitura do desempenho'),
                   SizedBox(height: spacing.sectionGap),
                   _SummaryRow(model: model),
                   SizedBox(height: spacing.sectionGap),

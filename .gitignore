@@ -60,3 +60,8 @@ obj/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Local privacy/security artifacts
+study_hub_export_*.json
+local_debug_exports/
+tokens/

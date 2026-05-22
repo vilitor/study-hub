@@ -14,12 +14,19 @@ class LocalStudySchemaService {
   const LocalStudySchemaService._();
 
   static const defaultStudyTimeField = LocalStudyFields.studyTime;
+  static const fallbackCategoryOptions = [
+    'Geral',
+    'Flutter',
+    'Matematica',
+    'Leitura',
+  ];
 
   static List<LocalStudyField> defaultFields({
     List<String> categories = const [],
+    bool useFallbackCategories = true,
   }) {
     final categoryOptions = categories.isEmpty
-        ? const ['Geral', 'Flutter', 'Matematica', 'Leitura']
+        ? (useFallbackCategories ? fallbackCategoryOptions : const <String>[])
         : categories;
     return [
       LocalStudyField(
@@ -65,8 +72,14 @@ class LocalStudySchemaService {
 
   static NotionDatabaseSchema defaultSchema({
     List<String> categories = const [],
+    bool useFallbackCategories = true,
   }) {
-    return schemaFromFields(defaultFields(categories: categories));
+    return schemaFromFields(
+      defaultFields(
+        categories: categories,
+        useFallbackCategories: useFallbackCategories,
+      ),
+    );
   }
 
   static NotionDatabaseSchema schemaFromFields(List<LocalStudyField> fields) {

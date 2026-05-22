@@ -19,6 +19,17 @@ class AppSettings {
   final bool linkCategoriesToNotion;
   final String? notionCategoryField;
   final RegisterFieldSource registerFieldSource;
+  final bool onboardingCompleted;
+  final int onboardingVersion;
+  final bool profilePersonalizationCompleted;
+  final bool starterSubjectsSeeded;
+  final bool legacyMigrationCompleted;
+  final bool contextualGuideCompleted;
+  final String? selectedStudyProfileId;
+  final String? selectedStudyProfileLabel;
+  final String? selectedStudyFocusId;
+  final String? selectedStudyFocusLabel;
+  final bool lumaPersonalizationEnabled;
 
   const AppSettings({
     this.isGoogleConnected = false,
@@ -37,6 +48,17 @@ class AppSettings {
     this.linkCategoriesToNotion = false,
     this.notionCategoryField,
     this.registerFieldSource = RegisterFieldSource.local,
+    this.onboardingCompleted = false,
+    this.onboardingVersion = 0,
+    this.profilePersonalizationCompleted = false,
+    this.starterSubjectsSeeded = false,
+    this.legacyMigrationCompleted = false,
+    this.contextualGuideCompleted = false,
+    this.selectedStudyProfileId,
+    this.selectedStudyProfileLabel,
+    this.selectedStudyFocusId,
+    this.selectedStudyFocusLabel,
+    this.lumaPersonalizationEnabled = true,
   });
 
   Map<String, dynamic> toCloudMap() {
@@ -51,6 +73,17 @@ class AppSettings {
       'linkCategoriesToNotion': linkCategoriesToNotion,
       'notionCategoryField': notionCategoryField,
       'registerFieldSource': registerFieldSource.name,
+      'onboardingCompleted': onboardingCompleted,
+      'onboardingVersion': onboardingVersion,
+      'profilePersonalizationCompleted': profilePersonalizationCompleted,
+      'starterSubjectsSeeded': starterSubjectsSeeded,
+      'legacyMigrationCompleted': legacyMigrationCompleted,
+      'contextualGuideCompleted': contextualGuideCompleted,
+      'selectedStudyProfileId': selectedStudyProfileId,
+      'selectedStudyProfileLabel': selectedStudyProfileLabel,
+      'selectedStudyFocusId': selectedStudyFocusId,
+      'selectedStudyFocusLabel': selectedStudyFocusLabel,
+      'lumaPersonalizationEnabled': lumaPersonalizationEnabled,
       'updatedAt': DateTime.now().toIso8601String(),
     };
   }
@@ -75,6 +108,21 @@ class AppSettings {
         (source) => source.name == map['registerFieldSource'],
         orElse: () => RegisterFieldSource.local,
       ),
+      onboardingCompleted: map['onboardingCompleted'] as bool? ?? false,
+      onboardingVersion: (map['onboardingVersion'] as num?)?.toInt() ?? 0,
+      profilePersonalizationCompleted:
+          map['profilePersonalizationCompleted'] as bool? ?? false,
+      starterSubjectsSeeded: map['starterSubjectsSeeded'] as bool? ?? false,
+      legacyMigrationCompleted:
+          map['legacyMigrationCompleted'] as bool? ?? false,
+      contextualGuideCompleted:
+          map['contextualGuideCompleted'] as bool? ?? false,
+      selectedStudyProfileId: map['selectedStudyProfileId']?.toString(),
+      selectedStudyProfileLabel: map['selectedStudyProfileLabel']?.toString(),
+      selectedStudyFocusId: map['selectedStudyFocusId']?.toString(),
+      selectedStudyFocusLabel: map['selectedStudyFocusLabel']?.toString(),
+      lumaPersonalizationEnabled:
+          map['lumaPersonalizationEnabled'] as bool? ?? true,
     );
   }
 
@@ -96,11 +144,23 @@ class AppSettings {
     bool? linkCategoriesToNotion,
     String? notionCategoryField,
     RegisterFieldSource? registerFieldSource,
+    bool? onboardingCompleted,
+    int? onboardingVersion,
+    bool? profilePersonalizationCompleted,
+    bool? starterSubjectsSeeded,
+    bool? legacyMigrationCompleted,
+    bool? contextualGuideCompleted,
+    String? selectedStudyProfileId,
+    String? selectedStudyProfileLabel,
+    String? selectedStudyFocusId,
+    String? selectedStudyFocusLabel,
+    bool? lumaPersonalizationEnabled,
     bool clearNotionDatabaseId = false,
     bool clearNotionCategoryField = false,
     bool clearGoogleProfile = false,
     bool clearGoogleName = false,
     bool clearGooglePhotoUrl = false,
+    bool clearStudyFocus = false,
   }) {
     return AppSettings(
       isGoogleConnected: isGoogleConnected ?? this.isGoogleConnected,
@@ -133,6 +193,29 @@ class AppSettings {
           ? null
           : notionCategoryField ?? this.notionCategoryField,
       registerFieldSource: registerFieldSource ?? this.registerFieldSource,
+      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      onboardingVersion: onboardingVersion ?? this.onboardingVersion,
+      profilePersonalizationCompleted:
+          profilePersonalizationCompleted ??
+          this.profilePersonalizationCompleted,
+      starterSubjectsSeeded:
+          starterSubjectsSeeded ?? this.starterSubjectsSeeded,
+      legacyMigrationCompleted:
+          legacyMigrationCompleted ?? this.legacyMigrationCompleted,
+      contextualGuideCompleted:
+          contextualGuideCompleted ?? this.contextualGuideCompleted,
+      selectedStudyProfileId:
+          selectedStudyProfileId ?? this.selectedStudyProfileId,
+      selectedStudyProfileLabel:
+          selectedStudyProfileLabel ?? this.selectedStudyProfileLabel,
+      selectedStudyFocusId: clearStudyFocus
+          ? null
+          : selectedStudyFocusId ?? this.selectedStudyFocusId,
+      selectedStudyFocusLabel: clearStudyFocus
+          ? null
+          : selectedStudyFocusLabel ?? this.selectedStudyFocusLabel,
+      lumaPersonalizationEnabled:
+          lumaPersonalizationEnabled ?? this.lumaPersonalizationEnabled,
     );
   }
 }

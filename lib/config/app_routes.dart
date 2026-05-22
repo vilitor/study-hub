@@ -5,6 +5,7 @@ import 'package:study_hub/screens/create_event/create_event_screen.dart';
 import 'package:study_hub/screens/study_log/study_log_screen.dart';
 import 'package:study_hub/screens/settings/settings_screen.dart';
 import 'package:study_hub/screens/history/registration_history_screen.dart';
+import 'package:study_hub/screens/luma/luma_screen.dart';
 
 /// Rotas de navegação do app
 /// Cada tela tem um nome (string) que usamos para navegar
@@ -15,6 +16,7 @@ class AppRoutes {
   static const String settings = '/settings';
   static const String history = '/history';
   static const String achievements = '/achievements';
+  static const String luma = '/luma';
 
   /// Mapa de todas as rotas do app
   static Map<String, WidgetBuilder> get routes => {
@@ -24,5 +26,6 @@ class AppRoutes {
     settings: (context) => const SettingsScreen(),
     history: (context) => const RegistrationHistoryScreen(),
     achievements: (context) => const AchievementsScreen(),
+    luma: (context) => const LumaScreen(),
   };
 }

@@ -131,7 +131,7 @@ class CertificateProvider extends ChangeNotifier {
         ..addAll(await _repository.getCertificates());
       notifyListeners();
     } catch (e) {
-      _lastError = 'Nao foi possivel carregar certificados.';
+      _lastError = 'Não foi possível carregar certificados.';
       debugPrint('[CertificateProvider] Error loading certificates: $e');
     } finally {
       _setLoading(false);
@@ -159,7 +159,7 @@ class CertificateProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _lastError = 'Nao foi possivel salvar o certificado.';
+      _lastError = 'Não foi possível salvar o certificado.';
       debugPrint('[CertificateProvider] Error saving certificate: $e');
       return false;
     }
@@ -173,7 +173,7 @@ class CertificateProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _lastError = 'Nao foi possivel excluir o certificado.';
+      _lastError = 'Não foi possível excluir o certificado.';
       debugPrint('[CertificateProvider] Error deleting certificate: $e');
       return false;
     }
@@ -186,7 +186,7 @@ class CertificateProvider extends ChangeNotifier {
     try {
       return await _fileService.pickAndStoreAttachment();
     } catch (e) {
-      _lastError = 'Nao foi possivel importar o arquivo.';
+      _lastError = 'Não foi possível importar o arquivo.';
       debugPrint('[CertificateProvider] Error picking attachment: $e');
       return null;
     } finally {
